@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+/*
+ * Snowman Logistics - Pan-India Utilization Control Tower
+ *
+ * Light executive canvas with a deep navy command rail. Colour carries
+ * status only; the neutral scale carries everything else. Tokens mirror
+ * src/lib/config/brand.ts so TypeScript and CSS cannot drift apart.
+ */
+
+@theme {
+  --color-brand-50: #eff6fd;
+  --color-brand-100: #e8f1fb;
+  --color-brand-200: #b9d5f1;
+  --color-brand-300: #8ab9e6;
+  --color-brand-400: #4a92d4;
+  --color-brand-500: #1b6ec2;
+  --color-brand-600: #1560ac;
+  --color-brand-700: #12508f;
+  --color-brand-800: #0f4172;
+  --color-brand-900: #0b2f53;
+  --color-brand-950: #071e36;
+
+  --color-ink: #111827;
+  --color-ink-soft: #374151;
+  --color-ink-muted: #6b7280;
+  --color-ink-faint: #9ca3af;
+
+  --color-canvas: #f4f6f9;
+  --color-surface: #ffffff;
+  --color-hairline: #e3e8ef;
+
+  --color-ok: #0f8a5f;
+  --color-ok-soft: #e7f6ef;
+  --color-ok-line: #a7dcc5;
+  --color-warn: #b7791f;
+  --color-warn-soft: #fdf6e3;
+  --color-warn-line: #efd79a;
+  --color-hot: #d97706;
+  --color-hot-soft: #fef3e2;
+  --color-hot-line: #f5c98a;
+  --color-bad: #c62828;
+  --color-bad-soft: #fdecec;
+  --color-bad-line: #f1b4b4;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Roboto Mono", Menlo, monospace;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular figures everywhere a number is compared down a column. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Visible, consistent keyboard focus. Never removed, only restyled. */
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Skip link - first tab stop on every page. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+}
+.skip-link:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  background: var(--color-brand-500);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: content-box;
+}
+
+/* Subtle, purposeful motion only. */
+@keyframes ct-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ct-enter {
+  animation: ct-fade-up 180ms ease-out both;
+}
+
+@keyframes ct-drawer-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.ct-drawer {
+  animation: ct-drawer-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Print / PDF.
+ *
+ * The daily distribution is a PDF attached to an email, so the print
+ * stylesheet is a first-class deliverable rather than an afterthought.
+ * A4 landscape matches what leadership already receives.
+ */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-page {
+    break-after: page;
+  }
+  .print-avoid-break {
+    break-inside: avoid;
+  }
+  .print-shell {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  a[href]::after {
+    content: "";
+  }
+}
+
+.print-only {
+  display: none;
+}
