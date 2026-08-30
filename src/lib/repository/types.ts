@@ -151,6 +151,73 @@ export interface CustomerQuery {
   sortDir?: 'asc' | 'desc'
 }
 
+// ---------------------------------------------------------------------------
+// Weekly comparison
+// ---------------------------------------------------------------------------
+
+export type WeeklyFlag =
+  | 'SUSTAINED_OVER'
+  | 'SUSTAINED_UNDER'
+  | 'VOLATILE'
+  | 'FLAT'
+  | 'NOT_COMPUTABLE'
+  | 'IMPROVING'
+  | 'DECLINING'
+
+export interface WeeklyCell {
+  weekEnding: string
+  utilizationPct: number | null
+  /**
+   * Movement against the previous week in PERCENTAGE POINTS.
+   *
+   * The legacy report labels this column "Percent Change" but publishes a
+   * percentage-point delta; the two differ materially at any utilization far
+   * from 100%. It is labelled honestly here.
+   */
+  changePp: number | null
+  status: string
+}
+
+export interface WeeklyRow {
+  id: string
+  kind: 'network' | 'region' | 'facility'
+  label: string
+  sublabel: string | null
+  regionId: string | null
+  facilityId: string | null
+  capacity: number | null
+  cells: WeeklyCell[]
+  latestPct: number | null
+  /** Movement across the whole displayed window, in percentage points. */
+  windowChangePp: number | null
+  /** Mean absolute week-on-week movement - how unsettled the site is. */
+  volatilityPp: number | null
+  status: string
+  flags: WeeklyFlag[]
+}
+
+export interface WeeklyComparison {
+  weekEndings: string[]
+  /** The week immediately before the window, used for the first column's delta. */
+  baselineWeek: string | null
+  network: WeeklyRow
+  regions: { region: WeeklyRow; facilities: WeeklyRow[] }[]
+  movers: { improving: WeeklyRow[]; declining: WeeklyRow[] }
+  watchlist: {
+    sustainedOver: WeeklyRow[]
+    sustainedUnder: WeeklyRow[]
+    volatile: WeeklyRow[]
+    flat: WeeklyRow[]
+    notComputable: WeeklyRow[]
+  }
+}
+
+export interface WeeklyQuery {
+  filters: FilterState
+  /** Number of week-ending columns to display. */
+  weeks: number
+}
+
 export interface DataSource {
   /** Master data - stable across filter changes. */
   listRegions(): Region[]
@@ -166,6 +233,9 @@ export interface DataSource {
 
   /** Depositor occupancy by location and temperature zone. */
   queryCustomerUtilization(request: CustomerQuery): CustomerUtilizationResult
+
+  /** Week-ending utilization by region and location, with movement. */
+  queryWeeklyComparison(request: WeeklyQuery): WeeklyComparison
 }
 
 export interface LocationQuery {

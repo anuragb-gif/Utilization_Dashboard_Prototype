@@ -220,6 +220,32 @@ export const REPORTS: ReportDefinition[] = [
       }),
   },
   {
+    id: 'weekly-comparison',
+    name: 'Weekly Utilization Comparison',
+    description: 'Week-ending utilization by region and location with the movement between each week, in percentage points.',
+    audience: 'LT / Executive, National Operations',
+    frequency: 'Weekly, Monday morning',
+    headers: ['Level', 'Region', 'Row', 'Name', 'Week ending', 'Utilization %', 'Movement (pp)', 'Window change (pp)', 'Volatility (pp/week)', 'Signals'],
+    rows: (s) => {
+      const w = dataSource.queryWeeklyComparison({ filters: s.filters, weeks: 4 })
+      const flat = [...w.regions.flatMap((g) => [g.region, ...g.facilities]), w.network]
+      return flat.flatMap((row) =>
+        row.cells.map((cell) => [
+          row.kind,
+          row.regionId,
+          row.label,
+          row.sublabel,
+          cell.weekEnding,
+          cell.utilizationPct,
+          cell.changePp,
+          row.windowChangePp,
+          row.volatilityPp,
+          row.flags.length ? row.flags.join('; ') : null,
+        ] as CellValue[]),
+      )
+    },
+  },
+  {
     id: 'customer-wise-utilization',
     name: 'Customer Wise Utilization',
     description: 'Depositor occupancy by region, location and temperature zone, with the Frozen + Chilled + Dry row total the legacy report calls FCD Pallets.',

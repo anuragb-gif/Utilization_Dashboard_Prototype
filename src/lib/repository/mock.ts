@@ -15,6 +15,11 @@ import type {
   ExecutionSeriesRow,
   LocationQueryResult,
   LocationRow,
+  WeeklyCell,
+  WeeklyComparison,
+  WeeklyFlag,
+  WeeklyQuery,
+  WeeklyRow,
   ZoneSeriesRow,
 } from './types'
 import type { ExecutionId, Facility, FilterState, TemperatureZoneId, UtilizationPoint } from '@/lib/domain/types'
@@ -29,6 +34,7 @@ import {
   FACILITIES,
   LOCATIONS,
   REGIONS,
+  REGION_ORDER,
   REGION_SNAPSHOT,
   TEMPERATURE_ZONES,
   ZONE_BY_ID,
@@ -41,6 +47,7 @@ import {
   FORECAST_DATES,
   HISTORY_DATES,
   NETWORK_SERIES,
+  dayOfWeek,
 } from '@/lib/data/timeseries'
 import {
   LAST_REFRESH_AT,
@@ -442,6 +449,106 @@ function buildCustomerRows(filters: FilterState): CustomerUtilizationRow[] {
 const customerCache = new Map<string, CustomerUtilizationRow[]>()
 
 // ---------------------------------------------------------------------------
+// Weekly comparison
+// ---------------------------------------------------------------------------
+
+/**
+ * Week-ending Sundays available in the history, oldest first.
+ *
+ * The legacy weekly comparison is published against Sunday week-endings, so
+ * the same anchor is used here rather than a rolling seven-day window - a
+ * report the business already reconciles against should not quietly change
+ * its period boundaries.
+ */
+const WEEK_ENDINGS: { date: string; index: number }[] = HISTORY_DATES.map((date, index) => ({ date, index })).filter(
+  (d) => dayOfWeek(d.date) === 0,
+)
+
+/** How settled a series is: mean absolute week-on-week movement. */
+function volatility(values: (number | null)[]): number | null {
+  const deltas: number[] = []
+  for (let i = 1; i < values.length; i += 1) {
+    const a = values[i - 1]
+    const b = values[i]
+    if (a === null || b === null) continue
+    deltas.push(Math.abs(b - a))
+  }
+  if (deltas.length === 0) return null
+  return Number((deltas.reduce((x, y) => x + y, 0) / deltas.length).toFixed(2))
+}
+
+function weeklyFlags(cells: WeeklyCell[], windowChange: number | null, vol: number | null): WeeklyFlag[] {
+  const values = cells.map((c) => c.utilizationPct).filter((v): v is number => v !== null)
+  const flags: WeeklyFlag[] = []
+  if (values.length === 0) return ['NOT_COMPUTABLE']
+  if (values.length === cells.length && values.every((v) => v > 100)) flags.push('SUSTAINED_OVER')
+  if (values.length === cells.length && values.every((v) => v < THRESHOLDS.underUtilizedPct)) flags.push('SUSTAINED_UNDER')
+  if (vol !== null && vol >= 2.5) flags.push('VOLATILE')
+  // A site whose reported utilization barely moves for a month is either
+  // genuinely static or its feed has stopped updating; both are worth a look.
+  if (vol !== null && vol < 0.25 && cells.length >= 3) flags.push('FLAT')
+  if (windowChange !== null && windowChange >= 3) flags.push('IMPROVING')
+  if (windowChange !== null && windowChange <= -3) flags.push('DECLINING')
+  return flags
+}
+
+/** Build one row from a set of facilities, aggregating pallets over capacity. */
+function weeklyRow(
+  id: string,
+  kind: WeeklyRow['kind'],
+  label: string,
+  sublabel: string | null,
+  regionId: string | null,
+  facilityId: string | null,
+  members: Facility[],
+  weeks: { date: string; index: number }[],
+  baseline: { date: string; index: number } | null,
+): WeeklyRow {
+  const scoped = members.filter((f) => f.capacity !== null && f.capacity > 0)
+  const capacity = scoped.reduce((sum, f) => sum + (f.capacity as number), 0)
+
+  const at = (weekIndex: number): number | null => {
+    if (capacity === 0) return null
+    const pallets = scoped.reduce((sum, f) => sum + (FACILITY_SERIES[f.id]?.historyPallets[weekIndex] ?? 0), 0)
+    return Number(((pallets / capacity) * 100).toFixed(2))
+  }
+
+  const baselinePct = baseline ? at(baseline.index) : null
+  const cells: WeeklyCell[] = weeks.map((week, i) => {
+    const pct = at(week.index)
+    const previous = i === 0 ? baselinePct : at(weeks[i - 1].index)
+    return {
+      weekEnding: week.date,
+      utilizationPct: pct,
+      changePp: pct === null || previous === null ? null : Number((pct - previous).toFixed(2)),
+      status: utilizationStatus(pct),
+    }
+  })
+
+  const values = cells.map((c) => c.utilizationPct)
+  const first = values.find((v) => v !== null) ?? null
+  const latest = [...values].reverse().find((v) => v !== null) ?? null
+  const windowChange = first === null || latest === null ? null : Number((latest - first).toFixed(2))
+  const vol = volatility(values)
+
+  return {
+    id,
+    kind,
+    label,
+    sublabel,
+    regionId,
+    facilityId,
+    capacity: capacity === 0 ? null : capacity,
+    cells,
+    latestPct: latest,
+    windowChangePp: windowChange,
+    volatilityPp: vol,
+    status: utilizationStatus(latest),
+    flags: weeklyFlags(cells, windowChange, vol),
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 export const mockDataSource: DataSource = {
   listRegions: () => REGIONS,
@@ -522,6 +629,65 @@ export const mockDataSource: DataSource = {
       locationCount: new Set(sorted.map((r) => r.facilityId)).size,
       excludedPallets: excluded,
       topTenSharePct: totals.fcdPallets === 0 ? null : Number(((topTen / totals.fcdPallets) * 100).toFixed(1)),
+    }
+  },
+
+  queryWeeklyComparison({ filters, weeks }: WeeklyQuery): WeeklyComparison {
+    const facilities = applyFilters(filters)
+    const available = WEEK_ENDINGS.slice(-(weeks + 1))
+    // One extra week is read so the first displayed column still has a
+    // movement figure, exactly as the legacy report shows one.
+    const hasBaseline = available.length > weeks
+    const baseline = hasBaseline ? available[0] : null
+    const window = hasBaseline ? available.slice(1) : available
+
+    const network = weeklyRow('network', 'network', 'Total', 'All regions in scope', null, null, facilities, window, baseline)
+
+    const regions = REGION_ORDER.map((regionId) => {
+      const members = facilities.filter((f) => f.regionId === regionId)
+      if (members.length === 0) return null
+      const meta = REGIONS.find((r) => r.id === regionId)
+      return {
+        region: weeklyRow(regionId, 'region', regionId, meta?.head ?? null, regionId, null, members, window, baseline),
+        facilities: members
+          .map((f) =>
+            weeklyRow(
+              f.id,
+              'facility',
+              f.code,
+              `${f.name} · ${CITY_BY_ID[f.cityId]?.name ?? ''}`,
+              regionId,
+              f.id,
+              [f],
+              window,
+              baseline,
+            ),
+          )
+          .sort((a, b) => (b.latestPct ?? -1) - (a.latestPct ?? -1)),
+      }
+    }).filter((r): r is { region: WeeklyRow; facilities: WeeklyRow[] } => r !== null)
+
+    const allFacilities = regions.flatMap((r) => r.facilities)
+    const ranked = allFacilities.filter((f) => f.windowChangePp !== null)
+
+    return {
+      weekEndings: window.map((w) => w.date),
+      baselineWeek: baseline?.date ?? null,
+      network,
+      regions,
+      movers: {
+        improving: [...ranked].sort((a, b) => (b.windowChangePp ?? 0) - (a.windowChangePp ?? 0)).slice(0, 5),
+        declining: [...ranked].sort((a, b) => (a.windowChangePp ?? 0) - (b.windowChangePp ?? 0)).slice(0, 5),
+      },
+      watchlist: {
+        sustainedOver: allFacilities.filter((f) => f.flags.includes('SUSTAINED_OVER')),
+        sustainedUnder: allFacilities.filter((f) => f.flags.includes('SUSTAINED_UNDER')),
+        volatile: [...allFacilities.filter((f) => f.flags.includes('VOLATILE'))]
+          .sort((a, b) => (b.volatilityPp ?? 0) - (a.volatilityPp ?? 0))
+          .slice(0, 6),
+        flat: allFacilities.filter((f) => f.flags.includes('FLAT')),
+        notComputable: allFacilities.filter((f) => f.flags.includes('NOT_COMPUTABLE')),
+      },
     }
   },
 
