@@ -8,6 +8,9 @@
 
 import type {
   ControlTowerSnapshot,
+  CustomerQuery,
+  CustomerUtilizationResult,
+  CustomerUtilizationRow,
   DataSource,
   ExecutionSeriesRow,
   LocationQueryResult,
@@ -29,7 +32,8 @@ import {
   REGION_SNAPSHOT,
   TEMPERATURE_ZONES,
   ZONE_BY_ID,
-  buildCustomers,
+  ZONE_GROUP,
+  CUSTOMER_SPECS,
 } from '@/lib/data/master'
 import {
   EXECUTIONS,
@@ -49,6 +53,7 @@ import { AGEING_BUCKETS, EXPIRY_BUCKETS, EXPIRY_UNDATED_PALLETS } from '@/lib/da
 import { DATA_QUALITY_REPORT } from '@/lib/data/dataquality'
 import { DOCK_BY_FACILITY, NETWORK_FLOW } from '@/lib/data/operations'
 import { PARK_AND_PAY_SITES } from '@/lib/data/parkandpay'
+import { CUSTOMER_ALLOCATIONS, buildCustomers, customerNumber } from '@/lib/data/customer-allocation'
 
 // ---------------------------------------------------------------------------
 // Filtering
@@ -327,7 +332,7 @@ function computeSnapshot(filters: FilterState): ControlTowerSnapshot {
     ageing: AGEING_BUCKETS,
     expiry: EXPIRY_BUCKETS,
     expiryUndatedPallets: EXPIRY_UNDATED_PALLETS,
-    customers: buildCustomers(network.utilizedPallets),
+    customers: buildCustomers(),
     dataQuality: DATA_QUALITY_REPORT,
   }
 }
@@ -364,6 +369,79 @@ function buildLocationRows(filters: FilterState): LocationRow[] {
 const locationCache = new Map<string, LocationRow[]>()
 
 // ---------------------------------------------------------------------------
+// Customer-wise utilization
+// ---------------------------------------------------------------------------
+
+/**
+ * Depositor occupancy by location, in the legacy report's three zones.
+ *
+ * Rebuilt from the same allocation the depositor list totals come from, so a
+ * depositor's network figure is the sum of its rows here and nothing has to be
+ * reconciled by hand.
+ */
+function buildCustomerRows(filters: FilterState): CustomerUtilizationRow[] {
+  const scoped = applyFilters(filters)
+  const allowed = new Map(scoped.map((f) => [f.id, f]))
+  const zoneFilter = filters.zoneIds.length > 0 ? new Set(filters.zoneIds) : null
+  const customerFilter = filters.customerIds.length > 0 ? new Set(filters.customerIds) : null
+
+  // customerId -> facilityId -> zone-group totals
+  const grid = new Map<string, { frozen: number; chilled: number; dry: number }>()
+  for (const a of CUSTOMER_ALLOCATIONS) {
+    if (!allowed.has(a.facilityId)) continue
+    if (zoneFilter && !zoneFilter.has(a.zoneId)) continue
+    if (customerFilter && !customerFilter.has(a.customerId)) continue
+    const key = `${a.customerId}|${a.facilityId}`
+    const cell = grid.get(key) ?? { frozen: 0, chilled: 0, dry: 0 }
+    const group = ZONE_GROUP[a.zoneId]
+    if (group === 'FROZEN') cell.frozen += a.pallets
+    else if (group === 'CHILLED') cell.chilled += a.pallets
+    else cell.dry += a.pallets
+    grid.set(key, cell)
+  }
+
+  // Location denominators, so "% of location" is a share of what is on screen.
+  const locationTotals = new Map<string, number>()
+  for (const [key, cell] of grid) {
+    const facilityId = key.split('|')[1]
+    locationTotals.set(facilityId, (locationTotals.get(facilityId) ?? 0) + cell.frozen + cell.chilled + cell.dry)
+  }
+  const networkTotal = [...locationTotals.values()].reduce((a, b) => a + b, 0)
+
+  const rows: CustomerUtilizationRow[] = []
+  for (const [key, cell] of grid) {
+    const [customerId, facilityId] = key.split('|')
+    const facility = allowed.get(facilityId)
+    const spec = CUSTOMER_SPECS.find((c) => c.id === customerId)
+    if (!facility || !spec) continue
+    const fcd = cell.frozen + cell.chilled + cell.dry
+    if (fcd === 0) continue
+    const locTotal = locationTotals.get(facilityId) ?? 0
+    const parts = facility.code.split('-')
+    rows.push({
+      customerId,
+      customerNo: customerNumber(customerId, facilityId) ?? 'N/A',
+      customerName: spec.name,
+      sector: spec.sector,
+      regionId: facility.regionId,
+      facilityId,
+      locationCode: `${parts[1] ?? facility.code}-${parts[2] ?? ''}`.replace(/-$/, ''),
+      facilityName: facility.name,
+      cityName: CITY_BY_ID[facility.cityId]?.name ?? 'Unknown',
+      frozen: cell.frozen,
+      chilled: cell.chilled,
+      dry: cell.dry,
+      fcdPallets: fcd,
+      pctOfLocation: locTotal === 0 ? null : Number(((fcd / locTotal) * 100).toFixed(2)),
+      pctOfNetwork: networkTotal === 0 ? null : Number(((fcd / networkTotal) * 100).toFixed(3)),
+    })
+  }
+  return rows
+}
+
+const customerCache = new Map<string, CustomerUtilizationRow[]>()
+
+// ---------------------------------------------------------------------------
 
 export const mockDataSource: DataSource = {
   listRegions: () => REGIONS,
@@ -378,6 +456,73 @@ export const mockDataSource: DataSource = {
     const snapshot = computeSnapshot(filters)
     snapshotCache.set(key, snapshot)
     return snapshot
+  },
+
+  queryCustomerUtilization({ filters, search, sortBy = 'fcd', sortDir = 'desc' }: CustomerQuery): CustomerUtilizationResult {
+    const key = filterKey(filters)
+    let rows = customerCache.get(key)
+    if (!rows) {
+      rows = buildCustomerRows(filters)
+      customerCache.set(key, rows)
+    }
+
+    const term = search?.trim().toLowerCase()
+    const filtered = term
+      ? rows.filter(
+          (r) =>
+            r.customerName.toLowerCase().includes(term) ||
+            r.customerNo.toLowerCase().includes(term) ||
+            r.sector.toLowerCase().includes(term) ||
+            r.locationCode.toLowerCase().includes(term) ||
+            r.facilityName.toLowerCase().includes(term) ||
+            r.regionId.toLowerCase().includes(term),
+        )
+      : rows
+
+    const dir = sortDir === 'asc' ? 1 : -1
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'customer':
+          return dir * a.customerName.localeCompare(b.customerName)
+        case 'frozen':
+          return dir * (a.frozen - b.frozen)
+        case 'chilled':
+          return dir * (a.chilled - b.chilled)
+        case 'dry':
+          return dir * (a.dry - b.dry)
+        default:
+          return dir * (a.fcdPallets - b.fcdPallets)
+      }
+    })
+
+    const totals = sorted.reduce(
+      (acc, r) => ({
+        frozen: acc.frozen + r.frozen,
+        chilled: acc.chilled + r.chilled,
+        dry: acc.dry + r.dry,
+        fcdPallets: acc.fcdPallets + r.fcdPallets,
+      }),
+      { frozen: 0, chilled: 0, dry: 0, fcdPallets: 0 },
+    )
+
+    // Depositor concentration is measured across the network, not per row.
+    const byCustomer = new Map<string, number>()
+    for (const r of sorted) byCustomer.set(r.customerId, (byCustomer.get(r.customerId) ?? 0) + r.fcdPallets)
+    const ranked = [...byCustomer.entries()].filter(([id]) => id !== 'others').sort((a, b) => b[1] - a[1])
+    const topTen = ranked.slice(0, 10).reduce((a, [, v]) => a + v, 0)
+
+    const excluded = sorted
+      .filter((r) => FACILITIES.find((f) => f.id === r.facilityId)?.capacity === null)
+      .reduce((a, r) => a + r.fcdPallets, 0)
+
+    return {
+      rows: sorted,
+      totals,
+      customerCount: byCustomer.size,
+      locationCount: new Set(sorted.map((r) => r.facilityId)).size,
+      excludedPallets: excluded,
+      topTenSharePct: totals.fcdPallets === 0 ? null : Number(((topTen / totals.fcdPallets) * 100).toFixed(1)),
+    }
   },
 
   queryLocations({ filters, search, page, pageSize, sortBy = 'utilization', sortDir = 'desc' }): LocationQueryResult {

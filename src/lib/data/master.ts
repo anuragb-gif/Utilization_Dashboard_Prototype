@@ -13,7 +13,6 @@
 
 import type {
   City,
-  Customer,
   ExecutionId,
   Facility,
   FacilityType,
@@ -52,9 +51,32 @@ export const ZONE_BY_ID = Object.fromEntries(TEMPERATURE_ZONES.map((z) => [z.id,
   { id: TemperatureZoneId; name: string; setPoint: string }
 >
 
+/**
+ * The legacy daily report groups storage into three zones - Frozen, Chilled
+ * and Dry - while the capacity master carries four. "Dry" is the union of
+ * controlled ambient and ambient; the mapping is declared here so every screen
+ * that has to speak the legacy report's language uses the same one.
+ */
+export type ZoneGroupId = 'FROZEN' | 'CHILLED' | 'DRY'
+
+export const ZONE_GROUP: Record<TemperatureZoneId, ZoneGroupId> = {
+  FROZEN: 'FROZEN',
+  CHILLED: 'CHILLED',
+  CONTROLLED_AMBIENT: 'DRY',
+  AMBIENT: 'DRY',
+}
+
+export const ZONE_GROUP_LABEL: Record<ZoneGroupId, string> = {
+  FROZEN: 'Frozen',
+  CHILLED: 'Chilled',
+  DRY: 'Dry',
+}
+
+export const ZONE_GROUP_ORDER: ZoneGroupId[] = ['FROZEN', 'CHILLED', 'DRY']
+
 export const FACILITY_TYPE_LABEL: Record<FacilityType, string> = {
   DISTRIBUTION_CENTRE: 'Distribution Centre',
-  FORWARD_COLD_DEPOT: 'Forward Cold Depot (FCD)',
+  FORWARD_COLD_DEPOT: 'Cold Depot',
   CROSS_DOCK: 'Cross Dock',
   PARK_AND_PAY: 'Park & Pay Yard',
 }
@@ -182,24 +204,24 @@ interface FacilitySpec {
 const FACILITY_SPECS: Record<RegionId, FacilitySpec[]> = {
   NORTH: [
     { code: 'SNL-KUN-01', name: 'Kundli Cold Campus', cityId: 'kundli', type: 'DISTRIBUTION_CENTRE', ownership: 'OWNED', execution: 'SNOWMAN_OWN', owner: 'Harpreet Sandhu', commissionedOn: '2014-06-01', weight: 22, bias: 1.04 },
-    { code: 'SNL-KUN-02', name: 'Kundli FCD', cityId: 'kundli', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Harpreet Sandhu', commissionedOn: '2019-11-15', weight: 7, bias: 0.93 },
+    { code: 'SNL-KUN-02', name: 'Kundli Cold Depot', cityId: 'kundli', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Harpreet Sandhu', commissionedOn: '2019-11-15', weight: 7, bias: 0.93 },
     { code: 'SNL-PWL-01', name: 'Palwal DC', cityId: 'palwal', type: 'DISTRIBUTION_CENTRE', ownership: 'OWNED', execution: 'SNOWMAN_OWN', owner: 'Nikhil Chaudhary', commissionedOn: '2016-03-20', weight: 16, bias: 1.01 },
     { code: 'SNL-GZB-01', name: 'Ghaziabad DC', cityId: 'ghaziabad', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Nikhil Chaudhary', commissionedOn: '2018-08-02', weight: 13, bias: 0.97 },
     { code: 'SNL-LKO-01', name: 'Lucknow DC', cityId: 'lucknow', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Anjali Verma', commissionedOn: '2020-02-10', weight: 12, bias: 1, pinnedPct: 86.4 },
     { code: 'SNL-JAI-01', name: 'Jaipur DC', cityId: 'jaipur', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Devendra Rathore', commissionedOn: '2017-05-25', weight: 11, bias: 0.9 },
-    { code: 'SNL-LDH-01', name: 'Ludhiana FCD', cityId: 'ludhiana', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Harpreet Sandhu', commissionedOn: '2021-01-18', weight: 9, bias: 0.86 },
+    { code: 'SNL-LDH-01', name: 'Ludhiana Cold Depot', cityId: 'ludhiana', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Harpreet Sandhu', commissionedOn: '2021-01-18', weight: 9, bias: 0.86 },
     { code: 'SNL-CHD-01', name: 'Chandigarh Cross Dock', cityId: 'chandigarh', type: 'CROSS_DOCK', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Harpreet Sandhu', commissionedOn: '2022-07-04', weight: 10, bias: 0.79 },
-    { code: 'SNL-DDN-01', name: 'Dehradun FCD', cityId: 'dehradun', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Anjali Verma', commissionedOn: '2025-12-01', weight: 0, bias: 1, capacityMissing: true, orphanUtilized: 485 },
+    { code: 'SNL-DDN-01', name: 'Dehradun Cold Depot', cityId: 'dehradun', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Anjali Verma', commissionedOn: '2025-12-01', weight: 0, bias: 1, capacityMissing: true, orphanUtilized: 485 },
   ],
   EAST: [
     { code: 'SNL-CCU-01', name: 'Kolkata Cold Campus', cityId: 'kolkata', type: 'DISTRIBUTION_CENTRE', ownership: 'OWNED', execution: 'SNOWMAN_OWN', owner: 'Arindam Bose', commissionedOn: '2012-09-12', weight: 24, bias: 1.05 },
     { code: 'SNL-DNK-01', name: 'Dankuni DC', cityId: 'dankuni', type: 'DISTRIBUTION_CENTRE', ownership: 'OWNED', execution: 'SNOWMAN_OWN', owner: 'Arindam Bose', commissionedOn: '2015-04-08', weight: 20, bias: 1.02 },
     { code: 'SNL-DNK-02', name: 'Dankuni Dedicated Block', cityId: 'dankuni', type: 'DISTRIBUTION_CENTRE', ownership: 'DEDICATED', execution: 'CUSTOMER_DEDICATED', owner: 'Arindam Bose', commissionedOn: '2021-06-30', weight: 12, bias: 1.09 },
-    { code: 'SNL-SLG-01', name: 'Siliguri FCD', cityId: 'siliguri', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Pradip Roy', commissionedOn: '2019-02-14', weight: 11, bias: 0.9 },
-    { code: 'SNL-GAU-01', name: 'Guwahati FCD', cityId: 'guwahati', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Pradip Roy', commissionedOn: '2018-10-05', weight: 10, bias: 0.94 },
+    { code: 'SNL-SLG-01', name: 'Siliguri Cold Depot', cityId: 'siliguri', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Pradip Roy', commissionedOn: '2019-02-14', weight: 11, bias: 0.9 },
+    { code: 'SNL-GAU-01', name: 'Guwahati Cold Depot', cityId: 'guwahati', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Pradip Roy', commissionedOn: '2018-10-05', weight: 10, bias: 0.94 },
     { code: 'SNL-PAT-01', name: 'Patna DC', cityId: 'patna', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Sanjay Kumar', commissionedOn: '2020-11-21', weight: 12, bias: 0.83 },
     { code: 'SNL-BBI-01', name: 'Bhubaneswar DC', cityId: 'bhubaneswar', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Sanjay Kumar', commissionedOn: '2019-07-19', weight: 11, bias: 0.88 },
-    { code: 'SNL-RNC-01', name: 'Ranchi FCD', cityId: 'ranchi', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Sanjay Kumar', commissionedOn: '2026-08-01', weight: 0, bias: 1, capacityMissing: true, orphanUtilized: 742 },
+    { code: 'SNL-RNC-01', name: 'Ranchi Cold Depot', cityId: 'ranchi', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Sanjay Kumar', commissionedOn: '2026-08-01', weight: 0, bias: 1, capacityMissing: true, orphanUtilized: 742 },
   ],
   'WEST-1': [
     { code: 'SNL-BOM-01', name: 'Bhiwandi Cold Campus', cityId: 'bhiwandi', type: 'DISTRIBUTION_CENTRE', ownership: 'OWNED', execution: 'SNOWMAN_OWN', owner: 'Firoz Shaikh', commissionedOn: '2011-03-15', weight: 18, bias: 1.03 },
@@ -208,17 +230,17 @@ const FACILITY_SPECS: Record<RegionId, FacilitySpec[]> = {
     { code: 'SNL-TLJ-01', name: 'Taloja DC', cityId: 'taloja', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Snehal Patil', commissionedOn: '2018-05-30', weight: 11, bias: 1.02 },
     { code: 'SNL-PNQ-01', name: 'Chakan DC', cityId: 'chakan', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Ganesh Kulkarni', commissionedOn: '2019-08-22', weight: 10, bias: 1, pinnedPct: 93.6 },
     { code: 'SNL-PNQ-02', name: 'Chakan Dedicated Block', cityId: 'chakan', type: 'DISTRIBUTION_CENTRE', ownership: 'DEDICATED', execution: 'CUSTOMER_DEDICATED', owner: 'Ganesh Kulkarni', commissionedOn: '2022-04-12', weight: 7, bias: 1.06 },
-    { code: 'SNL-NSK-01', name: 'Nashik FCD', cityId: 'nashik', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Ganesh Kulkarni', commissionedOn: '2020-10-09', weight: 7, bias: 0.9 },
+    { code: 'SNL-NSK-01', name: 'Nashik Cold Depot', cityId: 'nashik', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Ganesh Kulkarni', commissionedOn: '2020-10-09', weight: 7, bias: 0.9 },
     { code: 'SNL-AMD-01', name: 'Ahmedabad DC', cityId: 'ahmedabad', type: 'DISTRIBUTION_CENTRE', ownership: 'OWNED', execution: 'SNOWMAN_OWN', owner: 'Kiran Joshi', commissionedOn: '2015-01-27', weight: 9, bias: 0.97 },
-    { code: 'SNL-STV-01', name: 'Surat FCD', cityId: 'surat', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Kiran Joshi', commissionedOn: '2021-03-03', weight: 7, bias: 0.88 },
+    { code: 'SNL-STV-01', name: 'Surat Cold Depot', cityId: 'surat', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Kiran Joshi', commissionedOn: '2021-03-03', weight: 7, bias: 0.88 },
     { code: 'SNL-RAJ-01', name: 'Rajkot Cross Dock', cityId: 'rajkot', type: 'CROSS_DOCK', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Kiran Joshi', commissionedOn: '2023-02-16', weight: 5, bias: 0.82 },
   ],
   'WEST-2': [
     { code: 'SNL-IDR-01', name: 'Indore DC', cityId: 'indore', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Prashant Jain', commissionedOn: '2018-11-08', weight: 26, bias: 1, pinnedPct: 108.4 },
     { code: 'SNL-NAG-01', name: 'Nagpur DC', cityId: 'nagpur', type: 'DISTRIBUTION_CENTRE', ownership: 'OWNED', execution: 'SNOWMAN_OWN', owner: 'Rohit Bhandari', commissionedOn: '2016-07-14', weight: 24, bias: 1.02 },
-    { code: 'SNL-BHO-01', name: 'Bhopal FCD', cityId: 'bhopal', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Prashant Jain', commissionedOn: '2020-05-19', weight: 15, bias: 1.03 },
+    { code: 'SNL-BHO-01', name: 'Bhopal Cold Depot', cityId: 'bhopal', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Prashant Jain', commissionedOn: '2020-05-19', weight: 15, bias: 1.03 },
     { code: 'SNL-IXU-01', name: 'Sambhajinagar DC', cityId: 'sambhajinagar', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Rohit Bhandari', commissionedOn: '2019-09-27', weight: 18, bias: 0.99 },
-    { code: 'SNL-RPR-01', name: 'Raipur FCD', cityId: 'raipur', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Rohit Bhandari', commissionedOn: '2021-12-06', weight: 11, bias: 0.94 },
+    { code: 'SNL-RPR-01', name: 'Raipur Cold Depot', cityId: 'raipur', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Rohit Bhandari', commissionedOn: '2021-12-06', weight: 11, bias: 0.94 },
     { code: 'SNL-IDR-02', name: 'Indore Cross Dock', cityId: 'indore', type: 'CROSS_DOCK', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Prashant Jain', commissionedOn: '2023-06-20', weight: 6, bias: 0.96 },
   ],
   'SOUTH-1': [
@@ -226,20 +248,20 @@ const FACILITY_SPECS: Record<RegionId, FacilitySpec[]> = {
     { code: 'SNL-SRC-01', name: 'Sri City DC', cityId: 'sricity', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Ramesh Subramanian', commissionedOn: '2018-01-30', weight: 16, bias: 1.02 },
     { code: 'SNL-KRP-01', name: 'Krishnapatnam Port DC', cityId: 'krishnapatnam', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Bhaskar Reddy', commissionedOn: '2024-04-18', weight: 14, bias: 1, pinnedPct: 38.2 },
     { code: 'SNL-CJB-01', name: 'Coimbatore DC', cityId: 'coimbatore', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Ramesh Subramanian', commissionedOn: '2017-11-11', weight: 13, bias: 0.99 },
-    { code: 'SNL-IXM-01', name: 'Madurai FCD', cityId: 'madurai', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Ramesh Subramanian', commissionedOn: '2020-08-24', weight: 9, bias: 0.9 },
+    { code: 'SNL-IXM-01', name: 'Madurai Cold Depot', cityId: 'madurai', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Ramesh Subramanian', commissionedOn: '2020-08-24', weight: 9, bias: 0.9 },
     { code: 'SNL-HSR-01', name: 'Hosur DC', cityId: 'hosur', type: 'DISTRIBUTION_CENTRE', ownership: 'DEDICATED', execution: 'CUSTOMER_DEDICATED', owner: 'Bhaskar Reddy', commissionedOn: '2021-09-13', weight: 11, bias: 1.04 },
-    { code: 'SNL-VGA-01', name: 'Vijayawada FCD', cityId: 'vijayawada', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Bhaskar Reddy', commissionedOn: '2019-05-07', weight: 9, bias: 0.94 },
+    { code: 'SNL-VGA-01', name: 'Vijayawada Cold Depot', cityId: 'vijayawada', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Bhaskar Reddy', commissionedOn: '2019-05-07', weight: 9, bias: 0.94 },
     { code: 'SNL-VTZ-01', name: 'Visakhapatnam DC', cityId: 'visakhapatnam', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Bhaskar Reddy', commissionedOn: '2018-03-29', weight: 8, bias: 0.97 },
   ],
   'SOUTH-2': [
     { code: 'SNL-BLR-01', name: 'Bengaluru Cold Campus', cityId: 'bengaluru', type: 'DISTRIBUTION_CENTRE', ownership: 'OWNED', execution: 'SNOWMAN_OWN', owner: 'Deepa Shetty', commissionedOn: '2012-12-03', weight: 22, bias: 1.05 },
-    { code: 'SNL-BLR-02', name: 'Bengaluru FCD', cityId: 'bengaluru', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Deepa Shetty', commissionedOn: '2019-10-16', weight: 10, bias: 0.95 },
+    { code: 'SNL-BLR-02', name: 'Bengaluru Cold Depot', cityId: 'bengaluru', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Deepa Shetty', commissionedOn: '2019-10-16', weight: 10, bias: 0.95 },
     { code: 'SNL-HYD-01', name: 'Hyderabad DC', cityId: 'hyderabad', type: 'DISTRIBUTION_CENTRE', ownership: 'OWNED', execution: 'SNOWMAN_OWN', owner: 'Srinivas Rao', commissionedOn: '2014-08-21', weight: 21, bias: 1.03 },
     { code: 'SNL-HYD-02', name: 'Hyderabad Dedicated Block', cityId: 'hyderabad', type: 'DISTRIBUTION_CENTRE', ownership: 'DEDICATED', execution: 'CUSTOMER_DEDICATED', owner: 'Srinivas Rao', commissionedOn: '2022-02-09', weight: 12, bias: 1.01 },
     { code: 'SNL-COK-01', name: 'Kochi DC', cityId: 'kochi', type: 'DISTRIBUTION_CENTRE', ownership: 'LEASED', execution: 'SNOWMAN_OWN', owner: 'Mathew Varghese', commissionedOn: '2017-06-06', weight: 14, bias: 0.96 },
-    { code: 'SNL-MYQ-01', name: 'Mysuru FCD', cityId: 'mysuru', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Deepa Shetty', commissionedOn: '2021-04-27', weight: 8, bias: 0.88 },
-    { code: 'SNL-IXE-01', name: 'Mangaluru FCD', cityId: 'mangaluru', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Mathew Varghese', commissionedOn: '2020-01-15', weight: 7, bias: 0.85 },
-    { code: 'SNL-HBX-01', name: 'Hubballi FCD', cityId: 'hubballi', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Deepa Shetty', commissionedOn: '2026-07-15', weight: 0, bias: 1, capacityMissing: true, orphanUtilized: 615 },
+    { code: 'SNL-MYQ-01', name: 'Mysuru Cold Depot', cityId: 'mysuru', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Deepa Shetty', commissionedOn: '2021-04-27', weight: 8, bias: 0.88 },
+    { code: 'SNL-IXE-01', name: 'Mangaluru Cold Depot', cityId: 'mangaluru', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Mathew Varghese', commissionedOn: '2020-01-15', weight: 7, bias: 0.85 },
+    { code: 'SNL-HBX-01', name: 'Hubballi Cold Depot', cityId: 'hubballi', type: 'FORWARD_COLD_DEPOT', ownership: 'LEASED', execution: 'PARTNER_OPERATED', owner: 'Deepa Shetty', commissionedOn: '2026-07-15', weight: 0, bias: 1, capacityMissing: true, orphanUtilized: 615 },
   ],
 }
 
@@ -434,7 +456,7 @@ export const DUPLICATE_LOCATIONS: StorageLocation[] = (() => {
 // Depositors
 // ---------------------------------------------------------------------------
 
-interface CustomerSpec {
+export interface CustomerSpec {
   id: string
   name: string
   sector: string
@@ -446,7 +468,7 @@ interface CustomerSpec {
   revenuePerPallet?: number
 }
 
-const CUSTOMER_SPECS: CustomerSpec[] = [
+export const CUSTOMER_SPECS: CustomerSpec[] = [
   { id: 'himgiri', name: 'Himgiri Frozen Foods', sector: 'Frozen QSR supply', share: 11.4, change7d: 620, regionIds: ['NORTH', 'WEST-1', 'WEST-2', 'SOUTH-2'], facilityCount: 14, revenuePerPallet: 0.0128 },
   { id: 'sagarmatha', name: 'Sagarmatha Seafoods', sector: 'Marine exports', share: 8.9, change7d: -410, regionIds: ['SOUTH-1', 'SOUTH-2', 'WEST-1'], facilityCount: 9, revenuePerPallet: 0.0141 },
   { id: 'anandi-dairy', name: 'Anandi Dairy Co-operative', sector: 'Dairy', share: 8.2, change7d: 185, regionIds: ['WEST-1', 'WEST-2', 'NORTH'], facilityCount: 11, revenuePerPallet: 0.0119 },
@@ -472,20 +494,3 @@ const CUSTOMER_SPECS: CustomerSpec[] = [
   { id: 'godavari-dairy', name: 'Godavari Dairy', sector: 'Dairy', share: 0.8, change7d: 26, regionIds: ['SOUTH-1'], facilityCount: 2, revenuePerPallet: 0.0116 },
   { id: 'others', name: 'Other depositors (38)', sector: 'Mixed', share: 12.5, change7d: -203, regionIds: REGION_ORDER, facilityCount: 46, revenuePerPallet: 0.0113 },
 ]
-
-export function buildCustomers(networkOccupied: number): Customer[] {
-  const shares = CUSTOMER_SPECS.map((c) => c.share)
-  const pallets = allocateInteger(networkOccupied, shares)
-  return CUSTOMER_SPECS.map((spec, i) => ({
-    id: spec.id,
-    name: spec.name,
-    sector: spec.sector,
-    occupiedPallets: pallets[i],
-    change7d: spec.change7d,
-    regionIds: spec.regionIds,
-    facilityCount: spec.facilityCount,
-    monthlyRevenueInrLakh: spec.revenueMissing
-      ? null
-      : Number((pallets[i] * (spec.revenuePerPallet ?? 0.012)).toFixed(1)),
-  }))
-}

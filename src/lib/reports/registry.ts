@@ -131,9 +131,9 @@ export const REPORTS: ReportDefinition[] = [
       ]),
   },
   {
-    id: 'fcd',
-    name: 'FCD Report',
-    description: 'Forward Cold Depots only — capacity, utilized and empty pallets, as published by the legacy report.',
+    id: 'cold-depot',
+    name: 'Cold Depot Report',
+    description: 'Last-mile cold depots only — capacity, utilized and empty pallets. (Distinct from "FCD Pallets" in the legacy report, which is the Frozen + Chilled + Dry row total.)',
     audience: 'Regional Heads',
     frequency: 'Daily, 05:45 IST',
     headers: ['Code', 'Facility', 'Region', 'City', 'Capacity', 'Utilized', 'Empty', 'Utilization %', 'Status'],
@@ -218,6 +218,28 @@ export const REPORTS: ReportDefinition[] = [
           pct === null ? null : round(pct - site.targetPct, 1),
         ]
       }),
+  },
+  {
+    id: 'customer-wise-utilization',
+    name: 'Customer Wise Utilization',
+    description: 'Depositor occupancy by region, location and temperature zone, with the Frozen + Chilled + Dry row total the legacy report calls FCD Pallets.',
+    audience: 'National Operations, Commercial',
+    frequency: 'Daily, 05:45 IST',
+    headers: ['REGION', 'LOCATION', 'CUSTOMER NO', 'CUSTOMER NAME', 'FROZEN', 'CHILLED', 'DRY', 'FCD Pallets', '% of location'],
+    rows: (s) =>
+      dataSource
+        .queryCustomerUtilization({ filters: s.filters, sortBy: 'fcd', sortDir: 'desc' })
+        .rows.map((r) => [
+          r.regionId,
+          r.locationCode,
+          r.customerNo,
+          r.customerName,
+          r.frozen,
+          r.chilled,
+          r.dry,
+          r.fcdPallets,
+          r.pctOfLocation,
+        ]),
   },
   {
     id: 'inventory-ageing',

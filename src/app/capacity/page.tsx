@@ -260,25 +260,25 @@ export default function CapacityPage() {
 
       <Card>
         <CardHeader
-          title="Forward Cold Depot (FCD) Summary"
-          subtitle="The FCD block carried across from the legacy daily report"
-          tip="Forward Cold Depots are the last-mile depots between a distribution centre and the customer. The legacy report published FCD capacity, utilized and empty pallets as a separate block; that view is preserved here rather than dropped because it did not fit a new layout."
+          title="Cold Depot Summary"
+          subtitle="Last-mile depots between a distribution centre and the customer"
+          tip="Cold Depots are the last-mile sites between a distribution centre and the customer, reported separately because they are planned and stocked differently. Note: this is NOT what the legacy report means by &quot;FCD Pallets&quot; — there, FCD is the row total across Frozen, Chilled and Dry, which is shown on the Customers screen."
         />
         <dl className="grid grid-cols-2 gap-4 px-4 py-3 sm:grid-cols-4">
           <div>
-            <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">FCD count</dt>
+            <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Cold depots</dt>
             <dd className="tnum text-[20px] font-bold text-ink">{fcd.length}</dd>
           </div>
           <div>
-            <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">FCD capacity</dt>
+            <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Depot capacity</dt>
             <dd className="tnum text-[20px] font-bold text-ink">{formatNumber(fcdTotals.capacity)}</dd>
           </div>
           <div>
-            <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">FCD utilized pallets</dt>
+            <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Depot utilized pallets</dt>
             <dd className="tnum text-[20px] font-bold text-ink">{formatNumber(fcdTotals.occupied)}</dd>
           </div>
           <div>
-            <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">FCD empty pallets</dt>
+            <dt className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Depot empty pallets</dt>
             <dd className="tnum text-[20px] font-bold text-ink">{formatNumber(fcdTotals.available)}</dd>
           </div>
         </dl>

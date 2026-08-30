@@ -1,6 +1,7 @@
 import {
   Boxes,
   Building2,
+  Users,
   ClipboardList,
   Database,
   Gauge,
@@ -29,6 +30,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'utilization', label: 'Utilization', href: '/utilization', icon: TrendingUp, description: 'Trend against budget and last year' },
   { id: 'regions', label: 'Regions', href: '/regions', icon: Map, description: 'Region ranking and detail' },
   { id: 'warehouses', label: 'Warehouses', href: '/warehouses', icon: Building2, description: 'Facility and location utilization' },
+  { id: 'customers', label: 'Customers', href: '/customers', icon: Users, description: 'Customer-wise utilization by location and zone' },
   { id: 'inventory', label: 'Inventory', href: '/inventory', icon: Boxes, description: 'Ageing, expiry and depositor concentration' },
   { id: 'cold-chain', label: 'Cold Chain', href: '/cold-chain', icon: Snowflake, description: 'Temperature zones, compliance and FEFO' },
   { id: 'operations', label: 'Operations', href: '/operations', icon: Truck, description: 'Pallet flow, dock performance, Park & Pay' },

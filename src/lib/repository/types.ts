@@ -108,6 +108,49 @@ export interface ControlTowerSnapshot {
   dataQuality: DataQualityReport
 }
 
+/**
+ * One depositor's occupancy at one location, in the three zones the legacy
+ * daily report publishes. `fcdPallets` is the row total across those zones -
+ * that is what "FCD Pallets" means in the legacy report, not a facility type.
+ */
+export interface CustomerUtilizationRow {
+  customerId: string
+  customerNo: string
+  customerName: string
+  sector: string
+  regionId: string
+  facilityId: string
+  locationCode: string
+  facilityName: string
+  cityName: string
+  frozen: number
+  chilled: number
+  dry: number
+  fcdPallets: number
+  /** Share of this location's total occupancy held by this depositor. */
+  pctOfLocation: number | null
+  /** Share of the in-scope network occupancy. */
+  pctOfNetwork: number | null
+}
+
+export interface CustomerUtilizationResult {
+  rows: CustomerUtilizationRow[]
+  totals: { frozen: number; chilled: number; dry: number; fcdPallets: number }
+  customerCount: number
+  locationCount: number
+  /** Occupancy sitting at facilities with no capacity master row. */
+  excludedPallets: number
+  /** Top-ten depositor share of the reported occupancy. */
+  topTenSharePct: number | null
+}
+
+export interface CustomerQuery {
+  filters: FilterState
+  search?: string
+  sortBy?: 'fcd' | 'frozen' | 'chilled' | 'dry' | 'customer'
+  sortDir?: 'asc' | 'desc'
+}
+
 export interface DataSource {
   /** Master data - stable across filter changes. */
   listRegions(): Region[]
@@ -120,6 +163,9 @@ export interface DataSource {
 
   /** Location-level detail, paged so a 5,000 row extract never lands at once. */
   queryLocations(request: LocationQuery): LocationQueryResult
+
+  /** Depositor occupancy by location and temperature zone. */
+  queryCustomerUtilization(request: CustomerQuery): CustomerUtilizationResult
 }
 
 export interface LocationQuery {
