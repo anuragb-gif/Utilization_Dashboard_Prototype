@@ -11,6 +11,7 @@ import { ZoneUtilizationChart } from '@/components/charts/mini-charts'
 import { DataTable } from '@/components/ui/data-table'
 import { FACILITY_EXPORT_COLUMNS } from '@/components/control-tower/facility-board'
 import { Card, CardHeader, InfoTip, SectionTitle, StatusChip, UtilizationBar, Value } from '@/components/ui/primitives'
+import { BasisImpact, CapacityMixBar } from '@/components/panels/basis-bands'
 import { useSnapshot } from '@/lib/state/use-snapshot'
 import { useFilters } from '@/lib/state/filter-context'
 import { THRESHOLDS } from '@/lib/config/thresholds'
@@ -255,6 +256,125 @@ export default function CapacityPage() {
           ) : null}
         </Card>
       </div>
+
+      {/* Composition, not fullness: how much of the capacity being managed is
+          actually owned. The waterfall above answers how full the network is;
+          this answers whose shelves it is on. */}
+      <Card>
+        <CardHeader
+          title="Where the capacity comes from"
+          subtitle="Own positions against positions rented from third parties under Park & Pay"
+          tip="Rented capacity behaves differently from owned capacity: it expires with the contract, it is paid for whether or not it is filled, and it cannot be expanded on demand. A region carrying a large rented share is exposed in ways the utilization percentage alone does not show."
+          actions={
+            <Link
+              href="/park-and-pay"
+              className="inline-flex h-7 items-center rounded-md border border-hairline bg-surface px-2.5 text-[12px] font-medium text-brand-600 transition-colors hover:bg-brand-50 no-print"
+            >
+              Park &amp; Pay detail
+            </Link>
+          }
+        />
+        <div className="w-full min-w-0 overflow-x-auto">
+          <table className="w-full border-collapse">
+            <caption className="sr-only">Own and rented capacity by region</caption>
+            <thead>
+              <tr className="border-b border-hairline bg-slate-50/70">
+                <th scope="col" className="px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+                  Region
+                </th>
+                <th scope="col" className="min-w-[96px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+                  Own
+                </th>
+                <th scope="col" className="min-w-[96px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+                  Rented
+                </th>
+                <th scope="col" className="min-w-[96px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+                  Total managed
+                </th>
+                <th scope="col" className="min-w-[170px] px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+                  Mix
+                </th>
+                <th scope="col" className="min-w-[100px] px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+                  Effect on utilization
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {snapshot.parkAndPay.regions.map((row) => {
+                const c = row.comparison
+                const none = row.siteCount === 0
+                return (
+                  <tr key={row.regionId} className="border-b border-hairline/60 hover:bg-slate-50/60">
+                    <th scope="row" className="px-4 py-2 text-left font-normal">
+                      <Link href={`/regions/${row.regionId}`} className="text-[12px] font-semibold text-brand-600 hover:underline">
+                        {row.regionId}
+                      </Link>
+                    </th>
+                    <td className="tnum px-3 py-2 text-right text-[12px] font-semibold text-ink">
+                      {formatNumber(c.own.capacity)}
+                    </td>
+                    <td className="tnum px-3 py-2 text-right text-[12px] font-semibold text-ink">
+                      {none ? <span className="text-ink-faint">—</span> : formatNumber(c.parkAndPay.capacity)}
+                    </td>
+                    <td className="tnum px-3 py-2 text-right text-[12px] font-bold text-ink">
+                      {formatNumber(c.combined.capacity)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <CapacityMixBar ownCapacity={c.own.capacity} pnpCapacity={c.parkAndPay.capacity} />
+                      <span className="tnum mt-1 block text-[9.5px] text-ink-faint">
+                        {none ? 'Own only' : `${formatPct(c.capacitySharePct, 1)} rented`}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {none ? <span className="text-[11px] text-ink-faint">—</span> : <BasisImpact value={c.utilizationImpactPp} />}
+                    </td>
+                  </tr>
+                )
+              })}
+              <tr className="border-t-2 border-t-ink-soft bg-slate-100">
+                <th scope="row" className="px-4 py-2 text-left text-[12px] font-bold text-ink">
+                  Network
+                </th>
+                <td className="tnum px-3 py-2 text-right text-[12px] font-bold text-ink">
+                  {formatNumber(snapshot.parkAndPay.network.own.capacity)}
+                </td>
+                <td className="tnum px-3 py-2 text-right text-[12px] font-bold text-ink">
+                  {formatNumber(snapshot.parkAndPay.network.parkAndPay.capacity)}
+                </td>
+                <td className="tnum px-3 py-2 text-right text-[12px] font-bold text-ink">
+                  {formatNumber(snapshot.parkAndPay.network.combined.capacity)}
+                </td>
+                <td className="px-3 py-2">
+                  <CapacityMixBar
+                    ownCapacity={snapshot.parkAndPay.network.own.capacity}
+                    pnpCapacity={snapshot.parkAndPay.network.parkAndPay.capacity}
+                  />
+                  <span className="tnum mt-1 block text-[9.5px] text-ink-faint">
+                    {formatPct(snapshot.parkAndPay.network.capacitySharePct, 1)} rented
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <BasisImpact value={snapshot.parkAndPay.network.utilizationImpactPp} />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="border-t border-hairline px-4 py-2 text-[10.5px] leading-relaxed text-ink-faint">
+          {snapshot.parkAndPay.contractsExpiringSoon > 0 ? (
+            <>
+              {formatNumber(snapshot.parkAndPay.contractsExpiringPallets)} rented positions sit on contracts ending within{' '}
+              {THRESHOLDS.contractRenewalWindowDays} days. Owned capacity does not expire; rented capacity has to be
+              re-signed or replaced.
+            </>
+          ) : (
+            <>
+              No rented contract ends within {THRESHOLDS.contractRenewalWindowDays} days. Owned capacity does not expire;
+              rented capacity has to be re-signed or replaced.
+            </>
+          )}
+        </p>
+      </Card>
 
       <CapacityRiskForecast facilities={snapshot.facilities} limit={20} showAllHref="/exceptions" />
 

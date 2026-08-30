@@ -6,14 +6,11 @@ import { ArrowRight, PackageCheck, Truck, Warehouse } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { PalletFlowChart } from '@/components/charts/mini-charts'
 import { MultiSeriesLine } from '@/components/charts/multi-series'
-import { Card, CardHeader, DeltaChip, InfoTip, Sparkline, StatusChip, UtilizationBar, Value } from '@/components/ui/primitives'
+import { Card, CardHeader, DeltaChip, InfoTip, StatusChip, Value } from '@/components/ui/primitives'
 import { useSnapshot } from '@/lib/state/use-snapshot'
-import { dataSource } from '@/lib/repository'
-import { CITY_BY_ID } from '@/lib/data/master'
 import { DOCK_BY_FACILITY } from '@/lib/data/operations'
 import { KPI_DEFINITIONS } from '@/lib/config/kpi-definitions'
 import { CHART_COLORS } from '@/lib/config/brand'
-import { utilizationStatus } from '@/lib/config/thresholds'
 import { netMovement } from '@/lib/domain/metrics'
 import { formatIst, formatMinutes, formatNumber, formatPct } from '@/lib/utils'
 
@@ -22,7 +19,7 @@ export default function OperationsPage() {
   const flow = snapshot.operations.flow
   const today = flow[flow.length - 1]
   const yesterday = flow[flow.length - 2]
-  const parkAndPay = React.useMemo(() => dataSource.listParkAndPay(), [])
+  const pnp = snapshot.parkAndPay.network
 
   const net = today ? netMovement(today.inbound, today.outbound) : null
 
@@ -48,16 +45,11 @@ export default function OperationsPage() {
       .slice(0, 6)
   }, [snapshot.facilities])
 
-  const pnpFiltered = React.useMemo(() => {
-    const regions = snapshot.filters.regionIds
-    return regions.length === 0 ? parkAndPay : parkAndPay.filter((site) => regions.includes(site.regionId))
-  }, [parkAndPay, snapshot.filters.regionIds])
-
   return (
     <div className="space-y-4">
       <PageHeader
         title="Operations"
-        description="Pallet movement into and out of the network, how quickly receipts reach a storage location, and the Park & Pay yards."
+        description="Pallet movement into and out of the network, and how quickly receipts reach a storage location."
         crumbs={[{ label: 'Control Tower', href: '/' }, { label: 'Operations' }]}
       />
 
@@ -204,79 +196,35 @@ export default function OperationsPage() {
         </Card>
       </div>
 
+      {/* Park & Pay is storage, not movement. It has its own screen; what
+          belongs here is the one operational fact - rented space carries no
+          structural headroom, so an overflow there has nowhere to go. */}
       <Card>
         <CardHeader
-          title="Park & Pay Utilization"
-          subtitle="Vehicle yards, reported separately from pallet capacity"
-          tip="Park & Pay yards are measured in vehicle bays, not pallet positions, so they are deliberately excluded from network pallet utilization. The legacy report published this block and it is retained here rather than dropped for being visually inconvenient."
+          title="Park & Pay"
+          subtitle="Rented storage, reported on its own screen"
+          tip="Park & Pay is a separate operating model - pallet positions rented from third parties and sold on - so it is measured against its own contracted capacity rather than folded into network flow. The full grid, the contribution by region and the contract position are on the Park & Pay screen."
         />
-        <div className="w-full min-w-0 overflow-x-auto">
-          <table className="w-full border-collapse">
-            <caption className="sr-only">Park and Pay yard utilization</caption>
-            <thead>
-              <tr className="border-b border-hairline bg-slate-50/70 text-[10px] uppercase tracking-wider text-ink-muted">
-                <th scope="col" className="px-3 py-2 text-left font-semibold">Region</th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">Yard</th>
-                <th scope="col" className="px-3 py-2 text-left font-semibold">Location</th>
-                <th scope="col" className="px-3 py-2 text-right font-semibold">Bays</th>
-                <th scope="col" className="px-3 py-2 text-right font-semibold">Occupied</th>
-                <th scope="col" className="px-3 py-2 text-right font-semibold">Utilization</th>
-                <th scope="col" className="px-3 py-2 text-right font-semibold">Variance to target</th>
-                <th scope="col" className="px-3 py-2 text-center font-semibold">Daily trend</th>
-                <th scope="col" className="px-3 py-2 text-center font-semibold">Monthly trend</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pnpFiltered.map((site) => {
-                const pct =
-                  site.capacity === null || site.capacity === 0 ? null : (site.occupied / site.capacity) * 100
-                const variance = pct === null ? null : pct - site.targetPct
-                const monthly = site.monthly.map((m) => m.utilizationPct).filter((v): v is number => v !== null)
-                return (
-                  <tr key={site.id} className="border-b border-hairline/70 last:border-0 hover:bg-slate-50/60">
-                    <td className="px-3 py-2 text-[11.5px] font-medium">{site.regionId}</td>
-                    <td className="px-3 py-2 text-[11.5px] font-semibold text-ink">{site.name}</td>
-                    <td className="px-3 py-2 text-[11.5px] text-ink-muted">{CITY_BY_ID[site.cityId]?.name}</td>
-                    <td className="tnum px-3 py-2 text-right text-[11.5px]">
-                      <Value missing={site.capacity === null} reason="No bay master exists for this yard.">
-                        {formatNumber(site.capacity)}
-                      </Value>
-                    </td>
-                    <td className="tnum px-3 py-2 text-right text-[11.5px]">{formatNumber(site.occupied)}</td>
-                    <td className="px-3 py-2 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <span className={`tnum text-[11.5px] font-bold ${(pct ?? 0) > 100 ? 'text-bad' : 'text-ink'}`}>
-                          <Value missing={pct === null}>{formatPct(pct, 1)}</Value>
-                        </span>
-                        <StatusChip status={utilizationStatus(pct)} size="xs" />
-                      </div>
-                      <UtilizationBar pct={pct} targetPct={site.targetPct} className="mt-1 w-24" />
-                    </td>
-                    <td className="tnum px-3 py-2 text-right text-[11.5px]">
-                      {/* Neutral: for a yard, over-target and under-target are
-                          both just information; the status chip carries the
-                          judgement. */}
-                      <DeltaChip value={variance} neutral />
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <Sparkline
-                        values={site.daily.slice(-14).map((d) => d.occupied)}
-                        status={utilizationStatus(pct)}
-                        label={`14-day occupancy for ${site.name}`}
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {monthly.length > 1 ? (
-                        <Sparkline values={monthly} status={utilizationStatus(pct)} label={`12-month utilization for ${site.name}`} />
-                      ) : (
-                        <span className="text-[11px] text-ink-faint">N/A</span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3 px-4 py-3.5">
+          <Metric label="Contracted positions" value={formatNumber(pnp.parkAndPay.capacity)} />
+          <Metric label="Occupied" value={formatNumber(pnp.parkAndPay.utilizedPallets)} />
+          <Metric
+            label="Utilization"
+            value={formatPct(pnp.parkAndPay.utilizationPct, 2)}
+            tone={(pnp.parkAndPay.utilizationPct ?? 0) > 100 ? 'bad' : undefined}
+          />
+          <Metric
+            label="Over contracted space"
+            value={formatNumber(pnp.parkAndPay.overCapacityPallets)}
+            tone={pnp.parkAndPay.overCapacityPallets > 0 ? 'bad' : undefined}
+          />
+          <Link
+            href="/park-and-pay"
+            className="ml-auto inline-flex items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 py-1.5 text-[11.5px] font-semibold text-brand-600 transition-colors hover:border-brand-300 hover:bg-brand-50"
+          >
+            Open Park &amp; Pay
+            <ArrowRight className="h-3 w-3" strokeWidth={2.5} aria-hidden />
+          </Link>
         </div>
       </Card>
     </div>
@@ -324,6 +272,17 @@ function FlowArrow() {
   return (
     <div className="hidden items-center justify-center lg:flex" aria-hidden>
       <ArrowRight className="h-5 w-5 text-ink-faint" strokeWidth={2} />
+    </div>
+  )
+}
+
+function Metric({ label, value, tone }: { label: string; value: string; tone?: 'bad' }) {
+  return (
+    <div>
+      <p className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-ink-muted">{label}</p>
+      <p className={`tnum mt-0.5 text-[19px] font-bold leading-none ${tone === 'bad' ? 'text-bad' : 'text-ink'}`}>
+        {value}
+      </p>
     </div>
   )
 }

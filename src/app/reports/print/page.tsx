@@ -106,6 +106,13 @@ export default function PrintPackPage() {
                 <PrintKpi label="Empty pallets" value={formatNumber(network.netEmptyPallets)} note={`${formatNumber(network.availableCapacity)} truly available`} />
                 <PrintKpi label="Over capacity" value={`${network.overCapacityFacilities} sites`} note={`${formatNumber(network.overCapacityPallets)} pallets`} tone={network.overCapacityPallets > 0 ? 'bad' : undefined} />
                 <PrintKpi label="Forecast 7 / 14 / 30 d" value={`${formatPct(network.forecast.horizon7Pct, 1)} / ${formatPct(network.forecast.horizon14Pct, 1)} / ${formatPct(network.forecast.horizon30Pct, 1)}`} note="prototype forecast" />
+                {/* Every other figure on this sheet is the own network; this is
+                    the one place the rented book appears, so it is labelled. */}
+                <PrintKpi
+                  label="Incl. Park & Pay"
+                  value={formatPct(snapshot.parkAndPay.network.combined.utilizationPct)}
+                  note={`${formatNumber(snapshot.parkAndPay.network.parkAndPay.capacity)} rented positions · ${formatPp(snapshot.parkAndPay.network.utilizationImpactPp)}`}
+                />
               </tr>
             </tbody>
           </table>

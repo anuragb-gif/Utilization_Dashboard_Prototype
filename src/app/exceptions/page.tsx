@@ -20,6 +20,7 @@ const EXPORT_COLUMNS: ExportColumn<ExceptionRecord>[] = [
   { key: 'raisedAt', header: 'Raised at', value: (e) => e.raisedAt },
   { key: 'region', header: 'Region', value: (e) => e.regionId },
   { key: 'facility', header: 'Facility', value: (e) => e.facilityId },
+  { key: 'pnp', header: 'Park & Pay location', value: (e) => e.parkAndPaySiteId ?? null },
   { key: 'zone', header: 'Temperature zone', value: (e) => e.zoneId },
   { key: 'metric', header: 'Metric', value: (e) => e.metricLabel },
   { key: 'actual', header: 'Actual', value: (e) => e.actual },

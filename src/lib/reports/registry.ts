@@ -12,7 +12,7 @@ import type { ControlTowerSnapshot } from '@/lib/repository'
 import type { CellValue, ExportColumn } from '@/lib/export/exporters'
 import { dataSource } from '@/lib/repository'
 import { EXCEPTION_CATEGORY_LABEL } from '@/lib/domain/exceptions'
-import { EXECUTION_LABEL, FACILITY_TYPE_LABEL, OWNERSHIP_LABEL, CITY_BY_ID, ZONE_BY_ID } from '@/lib/data/master'
+import { EXECUTION_LABEL, FACILITY_TYPE_LABEL, OWNERSHIP_LABEL, ZONE_BY_ID } from '@/lib/data/master'
 import { FEFO_BREACHES } from '@/lib/data/coldchain'
 import { NEAR_EXPIRY_BUCKET_IDS } from '@/lib/data/inventory'
 import { KPI_DEFINITIONS } from '@/lib/config/kpi-definitions'
@@ -199,25 +199,55 @@ export const REPORTS: ReportDefinition[] = [
   },
   {
     id: 'park-and-pay',
-    name: 'Park & Pay',
-    description: 'Vehicle yard occupancy against bay capacity. Reported in bays, not pallet positions.',
-    audience: 'Regional Heads',
+    name: 'Park & Pay Utilization',
+    description: 'Occupancy of pallet positions rented from third parties, against the contracted capacity at each location. Published as a separate book from the own network.',
+    audience: 'Regional Heads, Commercial',
     frequency: 'Daily, 05:45 IST',
-    headers: ['Region', 'Yard', 'Location', 'Bays', 'Occupied', 'Utilization %', 'Target %', 'Variance pp'],
-    rows: () =>
-      dataSource.listParkAndPay().map((site) => {
-        const pct = site.capacity === null || site.capacity === 0 ? null : (site.occupied / site.capacity) * 100
-        return [
-          site.regionId,
-          site.name,
-          CITY_BY_ID[site.cityId]?.name ?? null,
-          site.capacity,
-          site.occupied,
-          round(pct, 1),
-          site.targetPct,
-          pct === null ? null : round(pct - site.targetPct, 1),
-        ]
-      }),
+    headers: [
+      'Region', 'Code', 'Location', 'Partner', 'Contracted positions', 'Occupied',
+      'Utilization %', 'Empty (capacity - occupied)', 'Over contracted', 'Contract ends', 'Feed reports contracted as occupied',
+    ],
+    rows: (s) =>
+      s.parkAndPay.sites.map((site) => [
+        site.regionId,
+        site.code,
+        site.name,
+        site.partner,
+        site.capacity,
+        site.utilizedPallets,
+        round(site.utilizationPct),
+        site.netEmptyPallets,
+        site.overCapacityPallets,
+        site.contractEndsOn,
+        site.reportsContractedAsOccupied ? 'Yes' : 'No',
+      ]),
+  },
+  {
+    id: 'basis-comparison',
+    name: 'Own vs Park & Pay Comparison',
+    description: 'Capacity, occupancy and utilization by region on all three bases: own network, Park & Pay, and the two combined.',
+    audience: 'LT / Executive, Commercial',
+    frequency: 'Daily, 05:45 IST',
+    headers: [
+      'Region', 'Own capacity', 'Own occupied', 'Own utilization %',
+      'P&P sites', 'P&P capacity', 'P&P occupied', 'P&P utilization %',
+      'Combined capacity', 'Combined occupied', 'Combined utilization %', 'Effect of including P&P (pp)',
+    ],
+    rows: (s) =>
+      s.parkAndPay.regions.map((row) => [
+        row.regionId,
+        row.comparison.own.capacity,
+        row.comparison.own.utilizedPallets,
+        round(row.comparison.own.utilizationPct),
+        row.siteCount,
+        row.comparison.parkAndPay.capacity,
+        row.comparison.parkAndPay.utilizedPallets,
+        round(row.comparison.parkAndPay.utilizationPct),
+        row.comparison.combined.capacity,
+        row.comparison.combined.utilizedPallets,
+        round(row.comparison.combined.utilizationPct),
+        round(row.comparison.utilizationImpactPp),
+      ]),
   },
   {
     id: 'weekly-comparison',

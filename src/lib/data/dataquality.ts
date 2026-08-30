@@ -12,7 +12,12 @@ import { PARK_AND_PAY_SITES } from './parkandpay'
 import { LAST_REFRESH_AT, LAST_SUCCESSFUL_REFRESH_AT } from './seed'
 
 const facilitiesMissingCapacity = FACILITIES.filter((f) => f.capacity === null)
-const yardsMissingCapacity = PARK_AND_PAY_SITES.filter((s) => s.capacity === null)
+/**
+ * Locations whose partner return is a flat, exactly-full figure rather than a
+ * measured count. Contracted space and occupied space are different
+ * measurements, so this is reported rather than corrected.
+ */
+const flatFullSites = PARK_AND_PAY_SITES.filter((s) => s.reportsContractedAsOccupied)
 
 /**
  * Movement rows whose warehouse code does not resolve to the facility master.
@@ -64,13 +69,18 @@ export const DATA_QUALITY_ISSUES: DataQualityIssue[] = [
     affected: DUPLICATE_LOCATIONS.map((l) => `${l.facilityId} / ${l.label} (duplicate of ${l.duplicateOf})`),
   },
   {
-    id: 'dq-yard-capacity',
+    id: 'dq-pnp-contracted-as-occupied',
     severity: 'medium',
-    label: 'Park & Pay yards with no bay master',
-    count: yardsMissingCapacity.length,
-    detail:
-      'Yards recording vehicle entries with no bay capacity on file. Occupancy is shown; utilization is reported as N/A rather than assumed.',
-    affected: yardsMissingCapacity.map((s) => `${s.id} - ${s.name}`),
+    label: 'Park & Pay occupancy reported as contracted',
+    count: flatFullSites.length,
+    detail: `${flatFullSites.length} rented locations covering ${flatFullSites
+      .reduce((sum, s) => sum + s.capacity, 0)
+      .toLocaleString('en-IN')} positions report exactly 100.00% on every day of the window (${flatFullSites
+      .map((s) => s.code)
+      .join(', ')}). Contracted space and occupied space are different measurements; a flat, exactly-full series suggests the partner return publishes the former. Park & Pay utilization is overstated by an unknown amount until a measured count is supplied.`,
+    action:
+      'Ask the partner sites for a measured daily occupancy count. Until then Park & Pay utilization is an upper bound, and the combined network figure inherits that.',
+    affected: flatFullSites.map((s) => `${s.code} - ${s.name} (${s.partner})`),
   },
   {
     id: 'dq-stale-telemetry',
@@ -95,6 +105,10 @@ export const DATA_QUALITY_REPORT: DataQualityReport = {
     { name: 'Capacity master', status: 'DEGRADED', lastLoadAt: '2026-08-24T05:45:00+05:30', records: 512 },
     { name: 'Chamber telemetry', status: 'OK', lastLoadAt: '2026-08-27T05:30:00+05:30', records: 13_841 },
     { name: 'Depositor billing extract', status: 'OK', lastLoadAt: LAST_REFRESH_AT, records: 1_284 },
+    // Partner-supplied, not extracted from the WMS: six of the twelve
+    // locations return a flat, exactly-full figure rather than a measured
+    // count, which is why this feed is DEGRADED rather than OK.
+    { name: 'Park & Pay partner returns', status: 'DEGRADED', lastLoadAt: LAST_REFRESH_AT, records: 12 },
   ],
   recordsProcessed: RECORDS_PROCESSED,
   recordsRejected: RECORDS_REJECTED,

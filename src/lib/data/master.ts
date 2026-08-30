@@ -117,6 +117,8 @@ export const CITIES: City[] = [
   { id: 'ranchi', name: 'Ranchi', state: 'Jharkhand', regionId: 'EAST', lat: 23.34, lng: 85.31 },
   // WEST-1
   { id: 'bhiwandi', name: 'Bhiwandi', state: 'Maharashtra', regionId: 'WEST-1', lat: 19.3, lng: 73.06 },
+  // Park & Pay only - rented space in cities where Snowman operates nothing of its own.
+  { id: 'mumbai', name: 'Mumbai', state: 'Maharashtra', regionId: 'WEST-1', lat: 19.08, lng: 72.88 },
   { id: 'palghar', name: 'Palghar', state: 'Maharashtra', regionId: 'WEST-1', lat: 19.7, lng: 72.77 },
   { id: 'taloja', name: 'Taloja', state: 'Maharashtra', regionId: 'WEST-1', lat: 19.08, lng: 73.1 },
   { id: 'chakan', name: 'Chakan (Pune)', state: 'Maharashtra', regionId: 'WEST-1', lat: 18.76, lng: 73.86 },
@@ -125,6 +127,7 @@ export const CITIES: City[] = [
   { id: 'surat', name: 'Surat', state: 'Gujarat', regionId: 'WEST-1', lat: 21.17, lng: 72.83 },
   { id: 'rajkot', name: 'Rajkot', state: 'Gujarat', regionId: 'WEST-1', lat: 22.3, lng: 70.8 },
   // WEST-2
+  { id: 'pune', name: 'Pune', state: 'Maharashtra', regionId: 'WEST-2', lat: 18.52, lng: 73.86 },
   { id: 'indore', name: 'Indore', state: 'Madhya Pradesh', regionId: 'WEST-2', lat: 22.72, lng: 75.86 },
   { id: 'nagpur', name: 'Nagpur', state: 'Maharashtra', regionId: 'WEST-2', lat: 21.15, lng: 79.09 },
   { id: 'bhopal', name: 'Bhopal', state: 'Madhya Pradesh', regionId: 'WEST-2', lat: 23.26, lng: 77.41 },

@@ -49,6 +49,10 @@ export const REASONS = {
   aboveThreshold: 'Utilization above threshold',
   emptyConcentration: 'Empty capacity concentration',
   dataQuality: 'Capacity master missing',
+  pnpOverCapacity: 'Rented space over capacity',
+  pnpIdle: 'Contracted space with no occupancy',
+  pnpContractRisk: 'Park & Pay contract expiring',
+  pnpFlatFeed: 'Park & Pay occupancy reported as contracted',
 } as const
 
 function primaryReason(

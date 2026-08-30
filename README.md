@@ -100,8 +100,21 @@ confirmed, so it is carried across under its original name with an explicit
 "Definition to be mapped from Snowman source system" note and no invented
 formula, target or threshold.
 
-**Park & Pay is measured in vehicle bays**, so it is deliberately excluded from
-pallet utilization and reported on its own.
+**Park & Pay is a separate book, not a footnote.** It is space rented from
+third parties and sold on to customers — ordinary pallet positions, directly
+comparable with own capacity, but with a different cost base and a contract
+that can lapse. So every affected screen reports own, Park & Pay and combined
+rather than one figure that quietly mixes them, and combined utilization is a
+genuine re-aggregation (capacities and occupancies summed, divided once) rather
+than an average of two percentages. Own stays the headline everywhere, so a
+screenshot can never be read as the wrong basis.
+
+**Contracted space and occupied space are different measurements.** Six of the
+twelve rented locations return exactly 100.00% on every day of the window,
+which is what a contracted figure looks like, not a measured count. That is
+surfaced as a data-quality finding and the rented utilization is described as
+an upper bound — it is not silently corrected. Contracted space standing empty
+is put to the reader as a commercial question, never as waste.
 
 ---
 
@@ -239,11 +252,17 @@ numbers as today. Nothing calls `Math.random()` or reads the wall clock.
 - 6 regions · 49 facilities (46 with a capacity master) · 43 cities
 - 423 storage locations across 4 temperature zones
 - 260 days of history + 30 days of projection, per facility
-- 24 depositors, pallet flow, dock performance, 14 Park & Pay yards
+- 24 depositors, pallet flow, dock performance
+- 12 Park & Pay locations · 11,663 rented pallet positions
 
 **Snapshot (reproduces the legacy report):** 162,281 capacity · 135,104
 occupied · 27,177 empty · **83.25%** network utilization. Regions: EAST 77.0,
 WEST-1 88.0, **WEST-2 102.0**, NORTH 80.0, SOUTH-1 76.0, SOUTH-2 83.0.
+
+**Park & Pay:** 11,663 contracted positions · 10,738 occupied · **92.07%**,
+reproducing the legacy grid's daily totals (92.07% on the report date, 91.96%
+the day before). Combined: 173,944 · 145,842 · **83.84%** — including the
+rented book moves the network figure by +0.59 pp.
 
 Everything reconciles bottom-up: `sum(location) = zone`, `sum(zone) = facility`,
 `sum(facility) = region`, `sum(region) = network`, and closing pallets in the

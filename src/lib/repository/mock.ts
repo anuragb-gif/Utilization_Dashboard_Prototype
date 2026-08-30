@@ -15,6 +15,9 @@ import type {
   ExecutionSeriesRow,
   LocationQueryResult,
   LocationRow,
+  ParkAndPayRegionRow,
+  ParkAndPaySiteRow,
+  ParkAndPayView,
   WeeklyCell,
   WeeklyComparison,
   WeeklyFlag,
@@ -22,9 +25,17 @@ import type {
   WeeklyRow,
   ZoneSeriesRow,
 } from './types'
-import type { ExecutionId, Facility, FilterState, TemperatureZoneId, UtilizationPoint } from '@/lib/domain/types'
+import type {
+  ExecutionId,
+  Facility,
+  FilterState,
+  ParkAndPaySite,
+  RegionId,
+  TemperatureZoneId,
+  UtilizationPoint,
+} from '@/lib/domain/types'
 import { THRESHOLDS, utilizationBandLabel, utilizationStatus } from '@/lib/config/thresholds'
-import { rollup, utilizationPct } from '@/lib/domain/metrics'
+import { compareBasis, rollup, utilizationPct } from '@/lib/domain/metrics'
 import { buildFacilityRollups, buildRegionRollups, buildZoneRollups } from '@/lib/domain/rollups'
 import { buildExceptions } from '@/lib/domain/exceptions'
 import { buildHealthScore } from '@/lib/domain/health'
@@ -34,6 +45,7 @@ import {
   FACILITIES,
   LOCATIONS,
   REGIONS,
+  REGION_BY_ID,
   REGION_ORDER,
   REGION_SNAPSHOT,
   TEMPERATURE_ZONES,
@@ -59,7 +71,7 @@ import { COLD_CHAIN_SUMMARY, TEMPERATURE_EXCURSIONS } from '@/lib/data/coldchain
 import { AGEING_BUCKETS, EXPIRY_BUCKETS, EXPIRY_UNDATED_PALLETS } from '@/lib/data/inventory'
 import { DATA_QUALITY_REPORT } from '@/lib/data/dataquality'
 import { DOCK_BY_FACILITY, NETWORK_FLOW } from '@/lib/data/operations'
-import { PARK_AND_PAY_SITES } from '@/lib/data/parkandpay'
+import { PARK_AND_PAY_GRID_DAYS, PARK_AND_PAY_SITES, parkAndPayCityName } from '@/lib/data/parkandpay'
 import { CUSTOMER_ALLOCATIONS, buildCustomers, customerNumber } from '@/lib/data/customer-allocation'
 
 // ---------------------------------------------------------------------------
@@ -242,6 +254,120 @@ function filterKey(filters: FilterState): string {
   ])
 }
 
+
+// ---------------------------------------------------------------------------
+// Park & Pay
+// ---------------------------------------------------------------------------
+
+/**
+ * Park & Pay responds to the region filter and nothing else.
+ *
+ * The facility-level filters - type, ownership, execution, temperature zone -
+ * describe attributes of the own network that rented space does not carry, so
+ * applying them would silently drop Park & Pay from view rather than filter it.
+ * Where a filter of that kind is active the screens say the scope is
+ * own-network only rather than showing a combined figure that is not comparable.
+ */
+function parkAndPayInScope(filters: FilterState): ParkAndPaySite[] {
+  if (filters.regionIds.length === 0) return PARK_AND_PAY_SITES
+  const allowed = new Set<RegionId>(filters.regionIds)
+  return PARK_AND_PAY_SITES.filter((site) => allowed.has(site.regionId))
+}
+
+function buildParkAndPayView(filters: FilterState, ownFacilities: Facility[]): ParkAndPayView {
+  const sites = parkAndPayInScope(filters)
+  const windowDates = sites[0]?.daily.map((d) => d.date) ?? []
+  const gridDates = windowDates.slice(-PARK_AND_PAY_GRID_DAYS)
+  const gridOffset = windowDates.length - gridDates.length
+
+  const rows: ParkAndPaySiteRow[] = sites.map((site) => {
+    const pct = utilizationPct(site)
+    const sevenDaysAgo = site.daily[site.daily.length - 8]
+    const previousPct =
+      sevenDaysAgo === undefined ? null : utilizationPct({ capacity: site.capacity, utilizedPallets: sevenDaysAgo.utilizedPallets })
+    const daysToContractEnd = Math.round(
+      (Date.parse(`${site.contractEndsOn}T00:00:00+05:30`) - Date.parse(`${REPORT_DATE}T00:00:00+05:30`)) / 86_400_000,
+    )
+    return {
+      id: site.id,
+      code: site.code,
+      name: site.name,
+      cityName: parkAndPayCityName(site),
+      regionId: site.regionId,
+      partner: site.partner,
+      contractEndsOn: site.contractEndsOn,
+      daysToContractEnd,
+      capacity: site.capacity,
+      utilizedPallets: site.utilizedPallets,
+      utilizationPct: pct,
+      availableCapacity: Math.max(site.capacity - site.utilizedPallets, 0),
+      overCapacityPallets: Math.max(site.utilizedPallets - site.capacity, 0),
+      netEmptyPallets: site.capacity - site.utilizedPallets,
+      status: utilizationStatus(pct),
+      change7dPp: pct === null || previousPct === null ? null : Number((pct - previousPct).toFixed(2)),
+      grid: site.daily.slice(gridOffset).map((d) => ({
+        date: d.date,
+        utilizedPallets: d.utilizedPallets,
+        utilizationPct: utilizationPct({ capacity: site.capacity, utilizedPallets: d.utilizedPallets }),
+      })),
+      spark: site.daily.map((d) => {
+        const p = utilizationPct({ capacity: site.capacity, utilizedPallets: d.utilizedPallets })
+        return p === null ? 0 : Number(p.toFixed(2))
+      }),
+      reportsContractedAsOccupied: site.reportsContractedAsOccupied,
+      idle: site.utilizedPallets === 0,
+    }
+  })
+
+  const ordered = [...rows].sort(
+    (a, b) => REGION_ORDER.indexOf(a.regionId) - REGION_ORDER.indexOf(b.regionId) || b.capacity - a.capacity,
+  )
+
+  const regionsInScope =
+    filters.regionIds.length > 0 ? REGION_ORDER.filter((r) => filters.regionIds.includes(r)) : REGION_ORDER
+
+  const regions: ParkAndPayRegionRow[] = regionsInScope.map((regionId) => {
+    const own = ownFacilities.filter((f) => f.regionId === regionId)
+    const pnp = sites.filter((s) => s.regionId === regionId)
+    return {
+      regionId,
+      regionName: REGION_BY_ID[regionId].name,
+      siteCount: pnp.length,
+      comparison: compareBasis(own, pnp),
+    }
+  })
+
+  const dailyTotals = gridDates.map((date, i) => {
+    let capacity = 0
+    let utilized = 0
+    for (const row of rows) {
+      capacity += row.capacity
+      utilized += row.grid[i]?.utilizedPallets ?? 0
+    }
+    return { date, capacity, utilizedPallets: utilized, utilizationPct: utilizationPct({ capacity, utilizedPallets: utilized }) }
+  })
+
+  const flatFull = rows.filter((r) => r.reportsContractedAsOccupied)
+  const idle = rows.filter((r) => r.idle)
+  const expiring = rows.filter((r) => r.daysToContractEnd <= THRESHOLDS.contractRenewalWindowDays)
+
+  return {
+    gridDates,
+    sites: ordered,
+    regions,
+    network: compareBasis(ownFacilities, sites),
+    dailyTotals,
+    flatFullSites: flatFull.length,
+    flatFullPallets: flatFull.reduce((sum, r) => sum + r.capacity, 0),
+    idlePallets: idle.reduce((sum, r) => sum + r.capacity, 0),
+    idleSites: idle.length,
+    regionsWithoutParkAndPay: regionsInScope.filter((r) => !sites.some((s) => s.regionId === r)),
+    overCapacitySites: rows.filter((r) => r.overCapacityPallets > 0).length,
+    contractsExpiringSoon: expiring.length,
+    contractsExpiringPallets: expiring.reduce((sum, r) => sum + r.capacity, 0),
+  }
+}
+
 function computeSnapshot(filters: FilterState): ControlTowerSnapshot {
   const facilities = applyFilters(filters)
   const network = rollup(facilities)
@@ -268,7 +394,11 @@ function computeSnapshot(filters: FilterState): ControlTowerSnapshot {
 
   const targetPct = THRESHOLDS.networkTargetPct
   const health = buildHealthScore(network, facilityRollups, change7dPp)
-  const exceptions = buildExceptions(facilityRollups)
+  const parkAndPay = buildParkAndPayView(filters, facilities)
+  const exceptions = buildExceptions(
+    facilityRollups,
+    filters.regionIds.length > 0 ? new Set<RegionId>(filters.regionIds) : null,
+  )
   const insights = buildInsights({
     network,
     regions: regionRollups,
@@ -341,6 +471,7 @@ function computeSnapshot(filters: FilterState): ControlTowerSnapshot {
     expiryUndatedPallets: EXPIRY_UNDATED_PALLETS,
     customers: buildCustomers(),
     dataQuality: DATA_QUALITY_REPORT,
+    parkAndPay,
   }
 }
 

@@ -10,6 +10,7 @@ import type {
   ExceptionCategory,
   ExceptionRecord,
   FacilityRollup,
+  RegionId,
   Severity,
 } from './types'
 import { REASONS } from './rollups'
@@ -19,6 +20,7 @@ import { FACILITY_BY_ID, REGION_BY_ID } from '@/lib/data/master'
 import { FEFO_BREACHES, TEMPERATURE_EXCURSIONS } from '@/lib/data/coldchain'
 import { DATA_QUALITY_ISSUES } from '@/lib/data/dataquality'
 import { DOCK_BY_FACILITY } from '@/lib/data/operations'
+import { PARK_AND_PAY_SITES } from '@/lib/data/parkandpay'
 import { LAST_REFRESH_AT, REPORT_DATE } from '@/lib/data/seed'
 import { KPI_DEFINITIONS } from '@/lib/config/kpi-definitions'
 
@@ -43,6 +45,14 @@ const RECOMMENDED_ACTION: Record<string, string> = {
     'Assess whether this is seasonal slack or structural over-capacity before it is reported as idle capacity.',
   [REASONS.dataQuality]:
     'Raise a capacity master request with IT / Data Admin. Until it is loaded this facility cannot be included in network utilization.',
+  [REASONS.pnpOverCapacity]:
+    'Confirm the overflow with the partner site, reconcile the rented position count against the contract, and either extend the contracted space or move the excess into an own facility with headroom.',
+  [REASONS.pnpIdle]:
+    'Commercial review: the space is contracted and being paid for. Place volume against it or serve notice at the next contract break - it is available capacity, not waste.',
+  [REASONS.pnpContractRisk]:
+    'Start the renewal now. A site running above its contracted positions has no fallback if the contract lapses.',
+  [REASONS.pnpFlatFeed]:
+    'Ask the partner sites for a measured daily occupancy count. Until then these locations inflate Park & Pay utilization by an unknown amount.',
 }
 
 const CATEGORY_FOR_REASON: Record<string, ExceptionCategory> = {
@@ -56,6 +66,10 @@ const CATEGORY_FOR_REASON: Record<string, ExceptionCategory> = {
   [REASONS.aboveThreshold]: 'CAPACITY',
   [REASONS.emptyConcentration]: 'CAPACITY',
   [REASONS.dataQuality]: 'DATA_QUALITY',
+  [REASONS.pnpOverCapacity]: 'CAPACITY',
+  [REASONS.pnpIdle]: 'CAPACITY',
+  [REASONS.pnpContractRisk]: 'OPERATIONS',
+  [REASONS.pnpFlatFeed]: 'DATA_QUALITY',
 }
 
 function capacityException(facility: FacilityRollup): ExceptionRecord | null {
@@ -224,13 +238,116 @@ function dataQualityExceptions(): ExceptionRecord[] {
     unit: 'records',
     reason: issue.detail,
     recommendedAction:
+      issue.action ??
       'Raise a data correction request with IT / Data Admin. Affected rows stay excluded from the published figures until it is closed.',
     owner: 'IT / Data Admin',
     status: 'OPEN' as const,
   }))
 }
 
-export function buildExceptions(facilities: FacilityRollup[]): ExceptionRecord[] {
+
+/**
+ * Park & Pay exceptions.
+ *
+ * Rented space fails in ways own space does not - a contract can lapse, and
+ * space can be paid for and stand empty - so it gets its own rules rather than
+ * being pushed through the facility engine. Idle contracted space is raised as
+ * a commercial review, never as waste.
+ */
+function parkAndPayExceptions(regionIds: Set<RegionId> | null): ExceptionRecord[] {
+  const sites = PARK_AND_PAY_SITES.filter((s) => !regionIds || regionIds.has(s.regionId))
+  const out: ExceptionRecord[] = []
+
+  for (const site of sites) {
+    const pct = site.capacity <= 0 ? null : (site.utilizedPallets / site.capacity) * 100
+    const over = Math.max(site.utilizedPallets - site.capacity, 0)
+    const label = `${site.code} · ${site.name}`
+
+    if (over > 0 && pct !== null) {
+      out.push({
+        id: `EXC-PNP-OVR-${site.id}`,
+        category: 'CAPACITY',
+        severity: pct >= 110 ? 'critical' : 'high',
+        raisedAt: LAST_REFRESH_AT,
+        regionId: site.regionId,
+        facilityId: null,
+        parkAndPaySiteId: site.id,
+        zoneId: null,
+        metricId: KPI_DEFINITIONS.networkUtilization.id,
+        metricLabel: `Park & Pay utilization · ${label}`,
+        actual: Number(pct.toFixed(2)),
+        threshold: 100,
+        variance: Number((pct - 100).toFixed(2)),
+        unit: '%',
+        reason: `${over.toLocaleString('en-IN')} pallets are held above the ${site.capacity.toLocaleString('en-IN')} positions contracted at ${site.partner}. Rented space has no structural headroom to absorb an overflow.`,
+        recommendedAction: RECOMMENDED_ACTION[REASONS.pnpOverCapacity],
+        owner: `${REGION_BY_ID[site.regionId].head} · Commercial`,
+        status: 'OPEN',
+      })
+    }
+
+    if (site.utilizedPallets === 0) {
+      const idleDays = site.daily.filter((d) => d.utilizedPallets === 0).length
+      out.push({
+        id: `EXC-PNP-IDLE-${site.id}`,
+        category: 'CAPACITY',
+        severity: 'high',
+        raisedAt: LAST_REFRESH_AT,
+        regionId: site.regionId,
+        facilityId: null,
+        parkAndPaySiteId: site.id,
+        zoneId: null,
+        metricId: KPI_DEFINITIONS.availableCapacity.id,
+        metricLabel: `Contracted space unused · ${label}`,
+        actual: site.capacity,
+        threshold: 0,
+        variance: site.capacity,
+        unit: 'pallets',
+        reason: `${site.capacity.toLocaleString('en-IN')} contracted positions at ${site.partner} have carried no occupancy for the last ${idleDays} days of the window. The space is available capacity that is being paid for, not waste.`,
+        recommendedAction: RECOMMENDED_ACTION[REASONS.pnpIdle],
+        owner: `${REGION_BY_ID[site.regionId].head} · Commercial`,
+        status: 'OPEN',
+      })
+    }
+
+    const daysToExpiry = Math.round(
+      (Date.parse(`${site.contractEndsOn}T00:00:00+05:30`) - Date.parse(`${REPORT_DATE}T00:00:00+05:30`)) / 86_400_000,
+    )
+    if (daysToExpiry <= THRESHOLDS.contractRenewalWindowDays && over > 0) {
+      out.push({
+        id: `EXC-PNP-CTR-${site.id}`,
+        category: 'OPERATIONS',
+        severity: 'high',
+        raisedAt: LAST_REFRESH_AT,
+        regionId: site.regionId,
+        facilityId: null,
+        parkAndPaySiteId: site.id,
+        zoneId: null,
+        metricId: KPI_DEFINITIONS.totalCapacity.id,
+        metricLabel: `Contract expiring · ${label}`,
+        actual: daysToExpiry,
+        threshold: THRESHOLDS.contractRenewalWindowDays,
+        variance: daysToExpiry - THRESHOLDS.contractRenewalWindowDays,
+        unit: 'days',
+        reason: `The ${site.partner} contract for ${site.capacity.toLocaleString('en-IN')} positions ends on ${site.contractEndsOn} - ${daysToExpiry} days away - while the site is running ${over.toLocaleString('en-IN')} pallets above it.`,
+        recommendedAction: RECOMMENDED_ACTION[REASONS.pnpContractRisk],
+        owner: 'Commercial · Network Planning',
+        status: 'OPEN',
+      })
+    }
+  }
+
+  // The flat, exactly-full partner returns are raised once by the data-quality
+  // builder from DATA_QUALITY_ISSUES; restating them here would double-count
+  // them in every severity total.
+
+  return out
+}
+
+export function buildExceptions(
+  facilities: FacilityRollup[],
+  parkAndPayRegionIds: Set<RegionId> | null = null,
+): ExceptionRecord[] {
   const facilityIds = new Set(facilities.map((f) => f.facilityId))
   const all = [
     ...facilities.map(capacityException).filter((e): e is ExceptionRecord => e !== null),
@@ -238,6 +355,7 @@ export function buildExceptions(facilities: FacilityRollup[]): ExceptionRecord[]
     ...inventoryExceptions().filter((e) => !e.facilityId || facilityIds.has(e.facilityId)),
     ...operationsExceptions(facilities),
     ...dataQualityExceptions(),
+    ...parkAndPayExceptions(parkAndPayRegionIds),
   ]
 
   // A facility can trigger both a capacity and an operations exception; that

@@ -16,6 +16,8 @@ import { UtilizationTrendChart } from '@/components/charts/utilization-trend'
 import { CapacityWaterfall } from '@/components/charts/capacity-waterfall'
 import { IndiaRegionMap } from '@/components/charts/india-map'
 import { Card, CardHeader, DemoDataBadge, DrilldownLink, SectionTitle } from '@/components/ui/primitives'
+import { BasisStrip } from '@/components/panels/basis-bands'
+import Link from 'next/link'
 import { useSnapshot } from '@/lib/state/use-snapshot'
 import { formatNumber, formatPct } from '@/lib/utils'
 import { UTILIZATION_BANDS } from '@/lib/config/thresholds'
@@ -34,6 +36,24 @@ export default function ControlTowerPage() {
       />
 
       <KpiStrip snapshot={snapshot} />
+
+      {/* The headline above is the own network, and stays that way. This says
+          what the same network reads once the rented book is included, so the
+          two are never confused for one another. */}
+      <section aria-label="Utilization with and without Park and Pay">
+        <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
+          <SectionTitle>Own network vs Park &amp; Pay</SectionTitle>
+          <Link
+            href="/park-and-pay"
+            className="text-[11.5px] font-medium text-brand-600 transition-colors hover:underline no-print"
+          >
+            {snapshot.parkAndPay.sites.length} rented{' '}
+            {snapshot.parkAndPay.sites.length === 1 ? 'location' : 'locations'}
+            {' · '}open Park &amp; Pay →
+          </Link>
+        </div>
+        <BasisStrip comparison={snapshot.parkAndPay.network} targetPct={snapshot.network.targetPct} />
+      </section>
 
       <div className="grid items-start gap-3 xl:grid-cols-[1fr_360px]">
         <Card>

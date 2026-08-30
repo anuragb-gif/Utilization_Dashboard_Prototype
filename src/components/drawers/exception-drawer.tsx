@@ -87,6 +87,7 @@ function ExceptionDrawerPanel({
           </span>
           {exception.regionId ? <span>{exception.regionId}</span> : null}
           {exception.facilityId ? <span>· {exception.facilityId}</span> : null}
+          {exception.parkAndPaySiteId ? <span>· Park &amp; Pay</span> : null}
           {exception.zoneId ? <span>· {exception.zoneId.replace('_', ' ')}</span> : null}
           <span className="text-ink-faint">
             · raised {formatIst(exception.raisedAt, 'dd MMM yyyy, HH:mm')} IST
@@ -156,6 +157,15 @@ function ExceptionDrawerPanel({
               <FileDown className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
               Export
             </Button>
+            {exception.parkAndPaySiteId ? (
+              <Link
+                href="/park-and-pay"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-surface px-3 text-[13px] font-medium text-ink-soft transition-colors hover:bg-slate-50"
+              >
+                <ExternalLink className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+                Open Park &amp; Pay
+              </Link>
+            ) : null}
             {exception.facilityId ? (
               <Link
                 href={`/warehouses/${encodeURIComponent(exception.facilityId)}`}

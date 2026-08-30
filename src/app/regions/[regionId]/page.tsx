@@ -15,6 +15,7 @@ import { ExceptionDrawer } from '@/components/drawers/exception-drawer'
 import { FacilityDrawer } from '@/components/drawers/facility-drawer'
 import { LocationUtilizationTable } from '@/components/panels/location-table'
 import { Card, CardHeader, DeltaChip, StatusChip, UtilizationBar, Value } from '@/components/ui/primitives'
+import { BasisBands } from '@/components/panels/basis-bands'
 import { useFilters } from '@/lib/state/filter-context'
 import { scopedFilters } from '@/lib/state/filter-context'
 import { useSnapshot } from '@/lib/state/use-snapshot'
@@ -49,6 +50,10 @@ export default function RegionDetailPage() {
   }, [regionId])
 
   const regionFilters = React.useMemo(() => scopedFilters(filters, { regionId }), [filters, regionId])
+
+  // The snapshot is already scoped to this region, so its Park & Pay
+  // comparison is the region's.
+  const pnp = snapshot.parkAndPay.network
 
   if (!region) {
     return (
@@ -130,6 +135,36 @@ export default function RegionDetailPage() {
           </p>
         </MetricTile>
       </div>
+
+      {/* Own, rented and combined for this region. The five tiles above are the
+          own network, which is what the region is managed against; this is what
+          the same region looks like once the space rented in it is included. */}
+      <Card>
+        <CardHeader
+          title="With and without Park & Pay"
+          subtitle={
+            pnp.parkAndPay.siteCount === 0
+              ? `${regionId} has no rented space, so the own figures above are the whole region`
+              : `${pnp.parkAndPay.siteCount} rented ${pnp.parkAndPay.siteCount === 1 ? 'location' : 'locations'} in ${regionId} · ${formatNumber(pnp.parkAndPay.capacity)} contracted positions`
+          }
+          tip="Park & Pay is space rented from third parties and sold on. It is a separate commercial book, so the region is reported on both bases rather than one figure that quietly mixes them. Combined utilization sums the capacities and occupancies and divides once."
+          actions={
+            pnp.parkAndPay.siteCount === 0 ? null : (
+              <Link
+                href="/park-and-pay"
+                className="inline-flex h-7 items-center rounded-md border border-hairline bg-surface px-2.5 text-[12px] font-medium text-brand-600 transition-colors hover:bg-brand-50 no-print"
+              >
+                Location detail
+              </Link>
+            )
+          }
+        />
+        <BasisBands
+          comparison={pnp}
+          caption={`${regionId} capacity, utilized pallets, empty pallets and utilization on the own, Park and Pay and combined bases`}
+          targetPct={region.targetPct}
+        />
+      </Card>
 
       <div className="grid items-start gap-3 xl:grid-cols-[1fr_420px]">
         <Card>

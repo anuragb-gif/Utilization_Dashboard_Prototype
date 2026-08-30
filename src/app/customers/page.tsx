@@ -186,6 +186,20 @@ export default function CustomerUtilizationPage() {
         </p>
       ) : null}
 
+      {snapshot.parkAndPay.sites.length > 0 ? (
+        <p className="rounded-md border border-hairline bg-slate-50 px-3 py-2 text-[11.5px] leading-relaxed text-ink-soft">
+          <strong className="text-ink">Own network only.</strong> Park &amp; Pay holds{' '}
+          {formatNumber(snapshot.parkAndPay.network.parkAndPay.utilizedPallets)} further pallets across{' '}
+          {snapshot.parkAndPay.sites.length} rented locations, also stored on behalf of customers. The partner feed
+          publishes a single occupancy figure per location with no depositor breakdown, so it cannot be attributed to
+          the rows below and is not added to them — it is reported on the{' '}
+          <Link href="/park-and-pay" className="font-semibold text-brand-600 hover:underline">
+            Park &amp; Pay
+          </Link>{' '}
+          screen instead.
+        </p>
+      ) : null}
+
       <Card>
         <CardHeader
           title="Customer Wise Utilization Report"

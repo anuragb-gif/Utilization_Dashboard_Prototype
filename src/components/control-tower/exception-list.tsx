@@ -99,7 +99,11 @@ export function ExceptionList({
                   <SeverityChip severity={exception.severity} className="mt-0.5 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-baseline gap-x-1.5 text-[12px] font-semibold text-ink">
-                      <span>{exception.facilityId ?? exception.regionId ?? 'Network'}</span>
+                      <span>
+                        {exception.parkAndPaySiteId
+                          ? `P&P · ${exception.regionId ?? 'Network'}`
+                          : (exception.facilityId ?? exception.regionId ?? 'Network')}
+                      </span>
                       <span className="font-normal text-ink-muted">{exception.metricLabel}</span>
                       <span className="tnum font-bold text-ink">{shortValue(exception)}</span>
                       {exception.threshold !== null ? (

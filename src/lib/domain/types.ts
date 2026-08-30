@@ -236,6 +236,8 @@ export interface ExceptionRecord {
   recommendedAction: string
   owner: string
   status: ExceptionStatus
+  /** Set when the exception was raised against a Park & Pay location. */
+  parkAndPaySiteId?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -248,6 +250,8 @@ export interface DataQualityIssue {
   label: string
   count: number
   detail: string
+  /** Overrides the generic remediation text when this issue needs its own. */
+  action?: string
   /** Entities affected, used for the drill-in list. */
   affected: string[]
 }
@@ -378,17 +382,56 @@ export interface FilterState {
 
 export interface ParkAndPaySite {
   id: string
+  /** Legacy location code, as published in the Park & Pay grid. */
+  code: string
+  /** Location name, as published. */
   name: string
   regionId: RegionId
-  cityId: string
-  /** Vehicle bays, not pallet positions. */
-  capacity: number | null
-  occupied: number
-  /** 30 days of daily occupancy, oldest first. */
-  daily: { date: string; occupied: number }[]
-  /** 12 months of average occupancy percentage, oldest first. */
-  monthly: { month: string; utilizationPct: number | null }[]
-  targetPct: number
+  /** Null where the site is a third-party location with no city master row. */
+  cityId: string | null
+  /** Rented pallet positions - directly comparable with own capacity. */
+  capacity: number
+  utilizedPallets: number
+  partner: string
+  contractEndsOn: string
+  /** Daily occupied pallets across the operational window, oldest first. */
+  daily: { date: string; utilizedPallets: number }[]
+  /**
+   * True where the feed publishes a flat, exactly-full figure - contracted
+   * space reported as occupied. Recorded so the reader can discount it, not
+   * so the figure can be silently corrected.
+   */
+  reportsContractedAsOccupied: boolean
+}
+
+/**
+ * Which book a figure is measured on.
+ *
+ * OWN is the default everywhere: it is what the legacy report publishes as the
+ * headline and what the network has always been managed against. The other two
+ * are offered alongside it, never in place of it.
+ */
+export type BasisId = 'OWN' | 'COMBINED' | 'PNP'
+
+export interface BasisRollup extends CapacityRollup {
+  basis: BasisId
+  siteCount: number
+}
+
+/** Own, Park & Pay and combined side by side, plus what P&P contributes. */
+export interface BasisComparison {
+  own: BasisRollup
+  parkAndPay: BasisRollup
+  combined: BasisRollup
+  /**
+   * Effect of including Park & Pay on the utilization percentage, in
+   * percentage points. Null when either side is not computable.
+   */
+  utilizationImpactPp: number | null
+  /** Park & Pay capacity as a share of combined capacity. */
+  capacitySharePct: number | null
+  /** Park & Pay occupied pallets as a share of combined occupancy. */
+  occupancySharePct: number | null
 }
 
 export type ComparisonPeriod = 'PREV_DAY' | 'PREV_WEEK' | 'PREV_MONTH' | 'SAME_PERIOD_LAST_YEAR' | 'BUDGET'

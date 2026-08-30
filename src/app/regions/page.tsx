@@ -6,12 +6,17 @@ import { PageHeader } from '@/components/layout/page-header'
 import { IndiaRegionMap } from '@/components/charts/india-map'
 import { RegionRanking } from '@/components/control-tower/region-ranking'
 import { Card, CardHeader, DeltaChip, StatusChip, UtilizationBar, Value } from '@/components/ui/primitives'
+import { BasisImpact, CapacityMixBar } from '@/components/panels/basis-bands'
 import { useSnapshot } from '@/lib/state/use-snapshot'
 import { REGION_BY_ID } from '@/lib/data/master'
 import { formatNumber, formatPct, formatPp } from '@/lib/utils'
 
 export default function RegionsPage() {
   const snapshot = useSnapshot()
+  const pnpByRegion = React.useMemo(
+    () => new Map(snapshot.parkAndPay.regions.map((row) => [row.regionId, row])),
+    [snapshot.parkAndPay.regions],
+  )
 
   return (
     <div className="space-y-4">
@@ -29,6 +34,7 @@ export default function RegionsPage() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {snapshot.regions.map((region) => {
           const over = (region.utilizationPct ?? 0) > 100
+          const pnp = pnpByRegion.get(region.regionId)
           return (
             <Link key={region.regionId} href={`/regions/${encodeURIComponent(region.regionId)}`} className="block">
               <Card className={`h-full p-4 transition-shadow hover:shadow-[0_2px_10px_rgba(16,24,40,0.1)] ${over ? 'border-bad-line' : ''}`}>
@@ -75,6 +81,39 @@ export default function RegionsPage() {
                     <strong className="tnum text-ink">{formatPp(region.variancePct)}</strong>
                   </span>
                   <DeltaChip value={region.change7dPct} />
+                </div>
+
+                {/* The figures above are the own network. This is what the same
+                    region reads once the space rented inside it is included -
+                    kept to one line, because for most regions it barely moves. */}
+                <div className="mt-2 border-t border-hairline pt-2">
+                  {pnp && pnp.siteCount > 0 ? (
+                    <>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-ink-faint">
+                          With Park &amp; Pay
+                        </span>
+                        <span className="tnum text-[12px] font-bold text-ink">
+                          {formatPct(pnp.comparison.combined.utilizationPct, 1)}
+                        </span>
+                        <BasisImpact value={pnp.comparison.utilizationImpactPp} className="text-[10.5px]" />
+                      </div>
+                      <CapacityMixBar
+                        ownCapacity={pnp.comparison.own.capacity}
+                        pnpCapacity={pnp.comparison.parkAndPay.capacity}
+                        className="mt-1.5 h-1.5"
+                      />
+                      <p className="tnum mt-1 text-[9.5px] text-ink-faint">
+                        {pnp.siteCount} rented {pnp.siteCount === 1 ? 'location' : 'locations'} ·{' '}
+                        {formatNumber(pnp.comparison.parkAndPay.capacity)} positions at{' '}
+                        {formatPct(pnp.comparison.parkAndPay.utilizationPct, 1)}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-[9.5px] text-ink-faint">
+                      No Park &amp; Pay space — the figures above are the whole region
+                    </p>
+                  )}
                 </div>
               </Card>
             </Link>

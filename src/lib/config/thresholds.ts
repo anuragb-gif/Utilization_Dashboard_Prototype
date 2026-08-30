@@ -50,6 +50,8 @@ export const THRESHOLDS = {
   dataStaleAfterHours: 12,
   /** Minimum acceptable data-quality score. */
   dataQualityPct: 97,
+  /** Days before a Park & Pay contract ends at which renewal becomes an issue. */
+  contractRenewalWindowDays: 60,
 } as const
 
 /** Resolve a utilization percentage to a status band. */

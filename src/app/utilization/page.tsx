@@ -4,7 +4,9 @@ import * as React from 'react'
 import { PageHeader } from '@/components/layout/page-header'
 import { UtilizationTrendChart } from '@/components/charts/utilization-trend'
 import { MultiSeriesLine } from '@/components/charts/multi-series'
-import { Card, CardHeader, DeltaChip, InfoTip, StatusChip, Value } from '@/components/ui/primitives'
+import { Card, CardHeader, DeltaChip, InfoTip, Segmented, StatusChip, Value } from '@/components/ui/primitives'
+import { BASIS_META, BASIS_OPTIONS, rollupFor } from '@/components/panels/basis-bands'
+import type { BasisId } from '@/lib/domain/types'
 import { useSnapshot } from '@/lib/state/use-snapshot'
 import { CHART_COLORS, ZONE_COLORS } from '@/lib/config/brand'
 import { EXECUTION_LABEL, TEMPERATURE_ZONES } from '@/lib/data/master'
@@ -21,6 +23,14 @@ const EXECUTION_COLORS: Record<string, string> = {
 export default function UtilizationPage() {
   const snapshot = useSnapshot()
   const { network } = snapshot
+
+  // Today's figure can be re-based; the comparison periods below it cannot.
+  // The rented book publishes 30 days of history against the 260 the own
+  // network carries, so a combined "same period last year" does not exist and
+  // is not invented.
+  const [basis, setBasis] = React.useState<BasisId>('OWN')
+  const active = rollupFor(snapshot.parkAndPay.network, basis)
+  const noParkAndPay = snapshot.parkAndPay.network.parkAndPay.siteCount === 0
 
   const zoneSeries = snapshot.zoneSeries
   const zoneRows = React.useMemo(() => {
@@ -92,18 +102,41 @@ export default function UtilizationPage() {
           <CardHeader
             title="Comparison Summary"
             subtitle="Today against every configured comparison period"
-            tip="Every comparison is computed from the same aggregated series shown on the left, so a number here can always be found on the chart."
+            tip="Every comparison is computed from the same aggregated series shown on the left, so a number here can always be found on the chart. Today's figure can be re-based onto the rented book; the comparison periods cannot, because Park & Pay publishes 30 days of history rather than the 260 the own network carries."
           />
           <div className="px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Utilization today</p>
-            <div className="mt-0.5 flex items-baseline gap-2">
-              <span className="tnum text-[30px] font-bold leading-none text-ink">{formatPct(network.utilizationPct)}</span>
-              <StatusChip status={utilizationStatus(network.utilizationPct)} />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">Utilization today</p>
+              {noParkAndPay ? null : (
+                <Segmented options={BASIS_OPTIONS} value={basis} onChange={setBasis} ariaLabel="Utilization basis" size="xs" />
+              )}
+            </div>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span
+                className={`tnum text-[30px] font-bold leading-none ${(active.utilizationPct ?? 0) > 100 ? 'text-bad' : 'text-ink'}`}
+              >
+                <Value missing={active.utilizationPct === null} reason="Nothing in scope on this basis has a capacity master row.">
+                  {formatPct(active.utilizationPct)}
+                </Value>
+              </span>
+              <StatusChip status={utilizationStatus(active.utilizationPct)} />
             </div>
             <p className="tnum mt-1 text-[11.5px] text-ink-muted">
-              {formatNumber(network.utilizedPallets)} of {formatNumber(network.capacity)} pallet positions
+              {formatNumber(active.utilizedPallets)} of <Value missing={active.capacity === null}>{formatNumber(active.capacity)}</Value>{' '}
+              pallet positions · {BASIS_META[basis].label}
             </p>
+            {basis === 'OWN' ? null : (
+              <p className="mt-1.5 text-[10.5px] leading-relaxed text-ink-faint">
+                {BASIS_META[basis].note}{' '}
+                The comparisons below and the trend on the left stay on the own network — Park
+                &amp; Pay publishes 30 days of history, so there is no combined previous month or same period last year
+                to compare against.
+              </p>
+            )}
           </div>
+          <p className="border-t border-hairline bg-slate-50/60 px-4 py-1.5 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-ink-muted">
+            Comparison periods · own network
+          </p>
           <dl className="divide-y divide-hairline border-t border-hairline">
             {comparisons.map((row) => (
               <div key={row.label} className="flex items-center justify-between gap-3 px-4 py-2">

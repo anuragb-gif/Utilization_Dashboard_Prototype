@@ -150,6 +150,49 @@ export default function EmailPreviewPage() {
               </tbody>
             </table>
 
+            {/* Own and combined side by side, because the daily mail is where
+                the two get confused most easily. */}
+            <EmailSection title="Own network and Park & Pay">
+              <table className="w-full border-collapse text-[11px]">
+                <caption className="sr-only">Utilization on the own, Park and Pay and combined bases</caption>
+                <thead>
+                  <tr className="bg-[#F1F5F9] text-left text-[10px] uppercase tracking-wider text-[#6B7280]">
+                    <th scope="col" className="border border-[#E3E8EF] px-2 py-1.5">Basis</th>
+                    <th scope="col" className="border border-[#E3E8EF] px-2 py-1.5 text-right">Capacity</th>
+                    <th scope="col" className="border border-[#E3E8EF] px-2 py-1.5 text-right">Utilized</th>
+                    <th scope="col" className="border border-[#E3E8EF] px-2 py-1.5 text-right">Empty</th>
+                    <th scope="col" className="border border-[#E3E8EF] px-2 py-1.5 text-right">Utilization</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(
+                    [
+                      ['Own network', snapshot.parkAndPay.network.own],
+                      ['Park & Pay (rented)', snapshot.parkAndPay.network.parkAndPay],
+                      ['Total (own + P&P)', snapshot.parkAndPay.network.combined],
+                    ] as const
+                  ).map(([label, roll], index) => (
+                    <tr key={label} style={index === 2 ? { background: '#F1F5F9', fontWeight: 700 } : undefined}>
+                      <td className="border border-[#E3E8EF] px-2 py-1.5 font-semibold">{label}</td>
+                      <td className="tnum border border-[#E3E8EF] px-2 py-1.5 text-right">{formatNumber(roll.capacity)}</td>
+                      <td className="tnum border border-[#E3E8EF] px-2 py-1.5 text-right">{formatNumber(roll.utilizedPallets)}</td>
+                      <td className="tnum border border-[#E3E8EF] px-2 py-1.5 text-right">{formatNumber(roll.netEmptyPallets)}</td>
+                      <td
+                        className="tnum border border-[#E3E8EF] px-2 py-1.5 text-right font-semibold"
+                        style={{ color: (roll.utilizationPct ?? 0) > 100 ? '#9B1C1C' : '#111827' }}
+                      >
+                        {formatPct(roll.utilizationPct)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-1.5 text-[10.5px] leading-relaxed text-[#6B7280]">
+                Park &amp; Pay is space rented from third parties and sold on. Every other figure in this mail is the own
+                network. Including the rented book moves network utilization by {formatPp(snapshot.parkAndPay.network.utilizationImpactPp)}.
+              </p>
+            </EmailSection>
+
             <EmailSection title="Region summary">
               <table className="w-full border-collapse text-[11px]">
             <caption className="sr-only">Data table</caption>

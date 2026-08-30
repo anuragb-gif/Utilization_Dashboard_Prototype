@@ -23,8 +23,11 @@ import type {
   HealthScore,
   Insight,
   PalletFlowPoint,
+  BasisComparison,
   ParkAndPaySite,
   Region,
+  RegionId,
+  StatusLevel,
   RegionRollup,
   StorageLocation,
   TemperatureExcursion,
@@ -79,6 +82,67 @@ export interface ExecutionSeriesRow {
   utilizationPct: number | null
 }
 
+
+// ---------------------------------------------------------------------------
+// Park & Pay
+// ---------------------------------------------------------------------------
+
+/** One rented location, with the day-by-day grid the legacy report publishes. */
+export interface ParkAndPaySiteRow {
+  id: string
+  code: string
+  name: string
+  cityName: string
+  regionId: RegionId
+  partner: string
+  contractEndsOn: string
+  daysToContractEnd: number
+  capacity: number
+  utilizedPallets: number
+  utilizationPct: number | null
+  availableCapacity: number
+  overCapacityPallets: number
+  /** capacity - utilized, allowed to go negative, as the legacy report shows. */
+  netEmptyPallets: number
+  status: StatusLevel
+  change7dPp: number | null
+  /** Utilization on each day of the published grid, oldest first. */
+  grid: { date: string; utilizedPallets: number; utilizationPct: number | null }[]
+  /** Occupancy across the whole operational window, for the trend. */
+  spark: number[]
+  reportsContractedAsOccupied: boolean
+  idle: boolean
+}
+
+export interface ParkAndPayRegionRow {
+  regionId: RegionId
+  regionName: string
+  siteCount: number
+  comparison: BasisComparison
+}
+
+export interface ParkAndPayView {
+  /** The dates of the published grid, oldest first. */
+  gridDates: string[]
+  sites: ParkAndPaySiteRow[]
+  regions: ParkAndPayRegionRow[]
+  /** Own vs Park & Pay vs combined for everything currently in scope. */
+  network: BasisComparison
+  /** Park & Pay totals on each day of the grid. */
+  dailyTotals: { date: string; capacity: number; utilizedPallets: number; utilizationPct: number | null }[]
+  /** Locations whose feed reports contracted space as occupied. */
+  flatFullSites: number
+  flatFullPallets: number
+  /** Contracted positions carrying no occupancy on the report date. */
+  idlePallets: number
+  idleSites: number
+  /** Regions in scope with no Park & Pay presence at all. */
+  regionsWithoutParkAndPay: RegionId[]
+  overCapacitySites: number
+  contractsExpiringSoon: number
+  contractsExpiringPallets: number
+}
+
 /** Everything one screen render needs, resolved in a single pass. */
 export interface ControlTowerSnapshot {
   filters: FilterState
@@ -106,6 +170,12 @@ export interface ControlTowerSnapshot {
   expiryUndatedPallets: number
   customers: Customer[]
   dataQuality: DataQualityReport
+  /**
+   * Park & Pay is a separate operating model - space rented from third parties
+   * and sold on. It is carried alongside the own-network figures rather than
+   * folded into them, so every screen can show own, Park & Pay and combined.
+   */
+  parkAndPay: ParkAndPayView
 }
 
 /**

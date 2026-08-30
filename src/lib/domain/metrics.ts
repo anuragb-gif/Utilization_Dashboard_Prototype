@@ -6,7 +6,7 @@
  * for "not computable" and are expected to render N/A rather than 0.
  */
 
-import type { CapacityRollup, StatusLevel } from './types'
+import type { BasisComparison, BasisId, BasisRollup, CapacityRollup, StatusLevel } from './types'
 import { THRESHOLDS, utilizationStatus } from '@/lib/config/thresholds'
 
 export interface CapacityInput {
@@ -182,4 +182,45 @@ export function expectedBreachDate(
     if (point.pct !== null && point.pct >= thresholdPct) return point.date
   }
   return null
+}
+
+
+/**
+ * Own, Park & Pay and combined, computed from the same primitives.
+ *
+ * Combined is a genuine re-aggregation - capacities and occupancies are summed
+ * and divided once - never an average of the two percentages, which would be
+ * wrong whenever the two books differ in size.
+ */
+export function basisRollup(basis: BasisId, items: CapacityInput[]): BasisRollup {
+  return { ...rollup(items), basis, siteCount: items.length }
+}
+
+export function compareBasis(own: CapacityInput[], parkAndPay: CapacityInput[]): BasisComparison {
+  const ownRollup = basisRollup('OWN', own)
+  const pnpRollup = basisRollup('PNP', parkAndPay)
+  const combined = basisRollup('COMBINED', [...own, ...parkAndPay])
+
+  const impact =
+    combined.utilizationPct === null || ownRollup.utilizationPct === null
+      ? null
+      : combined.utilizationPct - ownRollup.utilizationPct
+
+  const share = (part: number | null, whole: number | null): number | null => {
+    if (part === null || whole === null) return null
+    const ratio = safeDivide(part, whole)
+    return ratio === null ? null : ratio * 100
+  }
+
+  return {
+    own: ownRollup,
+    parkAndPay: pnpRollup,
+    combined,
+    utilizationImpactPp: impact,
+    capacitySharePct: share(pnpRollup.capacity, combined.capacity),
+    occupancySharePct: share(
+      pnpRollup.utilizedPallets,
+      combined.utilizedPallets === 0 ? null : combined.utilizedPallets,
+    ),
+  }
 }
