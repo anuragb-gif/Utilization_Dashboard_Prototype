@@ -2,6 +2,7 @@ import {
   Boxes,
   Building2,
   Users,
+  Sparkles,
   Handshake,
   CalendarRange,
   ClipboardList,
@@ -39,7 +40,8 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'cold-chain', label: 'Cold Chain', href: '/cold-chain', icon: Snowflake, description: 'Temperature zones, compliance and FEFO' },
   { id: 'operations', label: 'Operations', href: '/operations', icon: Truck, description: 'Pallet flow and dock performance' },
   { id: 'exceptions', label: 'Exceptions', href: '/exceptions', icon: TriangleAlert, description: 'Everything requiring intervention', badge: 'exceptions' },
-  { id: 'reports', label: 'Reports', href: '/reports', icon: ClipboardList, description: 'Report centre, email preview and print view' },
+  { id: 'assistant', label: 'Assistant', href: '/assistant', icon: Sparkles, description: 'Ask about the current position and get the calculation with it' },
+  { id: 'reports', label: 'Reports', href: '/reports', icon: ClipboardList, description: 'Report centre and the print view' },
   { id: 'data-quality', label: 'Data Quality', href: '/data-quality', icon: Database, description: 'Pipeline health and known gaps', badge: 'dataQuality' },
   { id: 'settings', label: 'Settings', href: '/settings', icon: Settings, description: 'KPI definitions, thresholds and access' },
 ]

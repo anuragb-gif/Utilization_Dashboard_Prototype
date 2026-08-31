@@ -100,6 +100,18 @@ confirmed, so it is carried across under its original name with an explicit
 "Definition to be mapped from Snowman source system" note and no invented
 formula, target or threshold.
 
+**The assistant is rules-based and says so.** No language model is connected,
+so the Assistant screen does not present itself as one. It resolves a question
+to a fixed set of intents over the published figures, reads the answer out of
+the semantic layer, and shows the formula, the source system and the owner
+beside it. When it cannot match a question it says so and lists what it can
+answer — it never guesses a figure. The screen also carries the honest
+position on connecting a model: the exact context payload that would be sent
+(the aggregated semantic layer, never the underlying rows), which prerequisites
+are already in place and which are not. A model belongs *in front* of that
+engine, translating a question and narrating a computed result — not behind it
+doing the arithmetic.
+
 **Park & Pay is a separate book, not a footnote.** It is space rented from
 third parties and sold on to customers — ordinary pallet positions, directly
 comparable with own capacity, but with a different cost base and a contract
@@ -128,6 +140,7 @@ src/
 │  ├─ cold-chain/ operations/ exceptions/ data-quality/ settings/
 │  ├─ regions/[regionId]/    Region drilldown
 │  ├─ warehouses/[facilityId]/ Facility drilldown
+│  ├─ assistant/             Rules-based analyst over the semantic layer
 │  └─ reports/               Report Centre and the Print/PDF pack
 │
 ├─ components/
