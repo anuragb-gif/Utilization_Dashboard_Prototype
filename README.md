@@ -100,6 +100,16 @@ confirmed, so it is carried across under its original name with an explicit
 "Definition to be mapped from Snowman source system" note and no invented
 formula, target or threshold.
 
+**The daily mail is reproduced as a report, not as a mail.** Each region and
+location gets the same figures the automated mail publishes — the F/C and Dry
+split, the own subtotal, Park & Pay and the combined total — but as one table
+where the subtotals read as subtotals and the arithmetic is visible: F/C plus
+Dry is the own total, own plus Park & Pay is the combined total. Both trends
+the mail carries are kept, percentage and pallets, because they answer
+different questions and can disagree when capacity moves. A region also gets
+the location-wise sheet the mail cannot: every warehouse on the same bands,
+side by side.
+
 **The assistant is rules-based and says so.** No language model is connected,
 so the Assistant screen does not present itself as one. It resolves a question
 to a fixed set of intents over the published figures, reads the answer out of

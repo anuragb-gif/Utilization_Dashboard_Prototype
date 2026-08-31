@@ -15,6 +15,9 @@ import type {
   ExecutionSeriesRow,
   LocationQueryResult,
   LocationRow,
+  DailyReportBands,
+  DailyReportLocationRow,
+  DailyReportView,
   ParkAndPayRegionRow,
   ParkAndPaySiteRow,
   ParkAndPayView,
@@ -28,6 +31,7 @@ import type {
 import type {
   ExecutionId,
   Facility,
+  FacilityRollup,
   FilterState,
   ParkAndPaySite,
   RegionId,
@@ -36,6 +40,7 @@ import type {
 } from '@/lib/domain/types'
 import { THRESHOLDS, utilizationBandLabel, utilizationStatus } from '@/lib/config/thresholds'
 import { compareBasis, rollup, utilizationPct } from '@/lib/domain/metrics'
+import { palletTrend, temperatureBooks } from '@/lib/domain/daily-report'
 import { buildFacilityRollups, buildRegionRollups, buildZoneRollups } from '@/lib/domain/rollups'
 import { buildExceptions } from '@/lib/domain/exceptions'
 import { buildHealthScore } from '@/lib/domain/health'
@@ -368,6 +373,84 @@ function buildParkAndPayView(filters: FilterState, ownFacilities: Facility[]): P
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// Daily report
+// ---------------------------------------------------------------------------
+
+/**
+ * Park & Pay attached to a warehouse's own city.
+ *
+ * The legacy location card for Chennai carries the Chennai rented space, so
+ * the join is by city rather than by facility: a rented location is a separate
+ * site, but it belongs to the same place in the mail the site receives.
+ */
+function parkAndPayForCity(cityId: string): ParkAndPaySite[] {
+  return PARK_AND_PAY_SITES.filter((site) => site.cityId === cityId)
+}
+
+function bandsFor(facilities: Facility[], pnpSites: ParkAndPaySite[], zoneIds: TemperatureZoneId[]): DailyReportBands {
+  const books = temperatureBooks(facilities, zoneIds)
+  const comparison = compareBasis(facilities, pnpSites)
+  return {
+    fc: books.fc,
+    dry: books.dry,
+    own: books.own,
+    parkAndPay: comparison.parkAndPay,
+    combined: comparison.combined,
+    parkAndPayImpactPp: comparison.utilizationImpactPp,
+  }
+}
+
+function describeScope(filters: FilterState, facilities: Facility[]): string {
+  if (filters.facilityIds.length === 1) {
+    const facility = facilities[0]
+    return facility ? `${facility.code} · ${facility.name}` : filters.facilityIds[0]
+  }
+  if (filters.regionIds.length === 1) return `${filters.regionIds[0]} region`
+  if (filters.regionIds.length > 1) return filters.regionIds.join(', ')
+  return 'Pan-India network'
+}
+
+function buildDailyReport(
+  filters: FilterState,
+  facilities: Facility[],
+  facilityRollups: FacilityRollup[],
+  history: UtilizationPoint[],
+): DailyReportView {
+  // A facility-scoped report picks up the rented space in its own city; a
+  // region-scoped one picks up the rented space in the region.
+  const cities = new Set(facilities.map((f) => f.cityId))
+  const pnpSites =
+    filters.facilityIds.length > 0
+      ? PARK_AND_PAY_SITES.filter((site) => site.cityId !== null && cities.has(site.cityId))
+      : parkAndPayInScope(filters)
+
+  const locations: DailyReportLocationRow[] = facilityRollups.map((row) => {
+    const facility = facilities.find((f) => f.id === row.facilityId)
+    const members = facility ? [facility] : []
+    const sites = parkAndPayForCity(row.cityId)
+    return {
+      ...bandsFor(members, sites, filters.zoneIds),
+      facilityId: row.facilityId,
+      code: row.code,
+      name: row.name,
+      cityName: row.cityName,
+      regionId: row.regionId,
+      status: row.status,
+      change7dPct: row.change7dPct,
+      parkAndPaySiteCount: sites.length,
+    }
+  })
+
+  return {
+    ...bandsFor(facilities, pnpSites, filters.zoneIds),
+    scopeLabel: describeScope(filters, facilities),
+    palletSeries: palletTrend(history.slice(-OPERATIONAL_WINDOW_DAYS)),
+    locations,
+  }
+}
+
 function computeSnapshot(filters: FilterState): ControlTowerSnapshot {
   const facilities = applyFilters(filters)
   const network = rollup(facilities)
@@ -472,6 +555,7 @@ function computeSnapshot(filters: FilterState): ControlTowerSnapshot {
     customers: buildCustomers(),
     dataQuality: DATA_QUALITY_REPORT,
     parkAndPay,
+    dailyReport: buildDailyReport(filters, facilities, facilityRollups, series.history),
   }
 }
 

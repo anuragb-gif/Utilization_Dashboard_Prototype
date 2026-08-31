@@ -24,6 +24,7 @@ import type {
   Insight,
   PalletFlowPoint,
   BasisComparison,
+  BasisRollup,
   ParkAndPaySite,
   Region,
   RegionId,
@@ -34,6 +35,7 @@ import type {
   UtilizationPoint,
   ZoneRollup,
 } from '@/lib/domain/types'
+import type { PalletTrendPoint } from '@/lib/domain/daily-report'
 
 export interface ComparisonSet {
   previousDayPct: number | null
@@ -143,6 +145,46 @@ export interface ParkAndPayView {
   contractsExpiringPallets: number
 }
 
+
+// ---------------------------------------------------------------------------
+// Daily report (the mail each warehouse and region receives)
+// ---------------------------------------------------------------------------
+
+/** The five bands the daily report publishes, for one scope. */
+export interface DailyReportBands {
+  /** Frozen + chilled. */
+  fc: CapacityRollup
+  dry: CapacityRollup
+  /** F/C + Dry - the own-network total. */
+  own: CapacityRollup
+  parkAndPay: BasisRollup
+  /** Own + Park & Pay, summed and divided once. */
+  combined: BasisRollup
+  /** Effect of including Park & Pay on the utilization percentage, in points. */
+  parkAndPayImpactPp: number | null
+}
+
+export interface DailyReportLocationRow extends DailyReportBands {
+  facilityId: string
+  code: string
+  name: string
+  cityName: string
+  regionId: RegionId
+  status: StatusLevel
+  change7dPct: number | null
+  /** Rented locations in the same city as this warehouse. */
+  parkAndPaySiteCount: number
+}
+
+export interface DailyReportView extends DailyReportBands {
+  /** What the scope is, in words, for the report header. */
+  scopeLabel: string
+  /** Daily occupancy in pallets against budget and the same period last year. */
+  palletSeries: PalletTrendPoint[]
+  /** One row per warehouse in scope, carrying the same bands. */
+  locations: DailyReportLocationRow[]
+}
+
 /** Everything one screen render needs, resolved in a single pass. */
 export interface ControlTowerSnapshot {
   filters: FilterState
@@ -176,6 +218,11 @@ export interface ControlTowerSnapshot {
    * folded into them, so every screen can show own, Park & Pay and combined.
    */
   parkAndPay: ParkAndPayView
+  /**
+   * The figures the legacy daily mail publishes for a region or a location,
+   * split into the F/C and Dry books it speaks in.
+   */
+  dailyReport: DailyReportView
 }
 
 /**

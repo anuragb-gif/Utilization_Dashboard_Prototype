@@ -12,6 +12,7 @@ import { ExceptionList } from '@/components/control-tower/exception-list'
 import { ExceptionDrawer } from '@/components/drawers/exception-drawer'
 import { LocationUtilizationTable } from '@/components/panels/location-table'
 import { Card, CardHeader, DeltaChip, SeverityChip, StatusChip, UtilizationBar, Value } from '@/components/ui/primitives'
+import { DailyReportCard, PalletTrendChart, reportStatus, reportSummaryLine } from '@/components/panels/daily-report'
 import { useFilters, scopedFilters } from '@/lib/state/filter-context'
 import { useSnapshot } from '@/lib/state/use-snapshot'
 import { dataSource } from '@/lib/repository'
@@ -32,6 +33,9 @@ export default function FacilityDetailPage() {
   const snapshot = useSnapshot(overrides)
   const [exception, setException] = React.useState<ExceptionRecord | null>(null)
 
+  // The snapshot is scoped to this facility, so its daily report is the
+  // location's - including the rented space in the same city.
+  const report = snapshot.dailyReport
   const facility = snapshot.facilities.find((f) => f.facilityId === facilityId)
   const master = dataSource.listFacilities().find((f) => f.id === facilityId)
   const facilityFilters = React.useMemo(() => scopedFilters(filters, { facilityId }), [filters, facilityId])
@@ -141,23 +145,49 @@ export default function FacilityDetailPage() {
         </Tile>
       </div>
 
-      <div className="grid items-start gap-3 xl:grid-cols-[1fr_400px]">
+      {/* The daily mail this location receives, as a sheet: F/C, Dry, the own
+          subtotal, the rented space in its city, and the combined total. */}
+      <Card>
+        <CardHeader
+          title="Daily Report"
+          subtitle={reportSummaryLine(report, facility.code)}
+          tip="Reproduces the figures the automated daily mail publishes for this location — the F/C and Dry split, the own subtotal, Park & Pay and the combined total — with the arithmetic between them visible. Park & Pay is the rented space in this warehouse's own city, which is how the location mail reports it."
+          actions={<StatusChip status={reportStatus(report)} />}
+        />
+        <DailyReportCard
+          bands={report}
+          caption={`${facility.code} capacity, utilized pallets, empty pallets and utilization by temperature book, Park and Pay and combined`}
+          targetPct={facility.targetPct}
+        />
+      </Card>
+
+      {/* Both trends the mail publishes - percentage and pallets. */}
+      <div className="grid items-start gap-3 xl:grid-cols-2">
         <Card>
-          <CardHeader title="Utilization Trend" subtitle="Actual, budget, last year and prototype forecast" />
+          <CardHeader title="Utilization Trend" subtitle="Percentage against budget, last year and the prototype forecast" />
           <UtilizationTrendChart
             history={snapshot.series.history}
             forecast={snapshot.series.forecast}
             targetPct={facility.targetPct}
-            height={260}
+            height={250}
           />
         </Card>
         <Card>
-          <CardHeader title="Capacity Breakdown" />
-          <CapacityWaterfall rollup={facility} height={170} />
+          <CardHeader
+            title="Occupancy Trend"
+            subtitle="Pallets held against budget and the same period last year"
+            tip="The same window in pallets rather than percent. The two can move in opposite directions when capacity changes, which is why the daily report publishes both."
+          />
+          <PalletTrendChart points={report.palletSeries} height={250} />
         </Card>
       </div>
 
       <div className="grid items-start gap-3 xl:grid-cols-3">
+        <Card>
+          <CardHeader title="Capacity Breakdown" />
+          <CapacityWaterfall rollup={facility} height={170} />
+        </Card>
+
         <Card>
           <CardHeader title="Temperature Zones" subtitle="Chamber groups within this facility" />
           <ZoneUtilizationChart zones={snapshot.zones} height={170} />
