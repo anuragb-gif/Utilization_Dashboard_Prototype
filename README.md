@@ -128,7 +128,7 @@ src/
 │  ├─ cold-chain/ operations/ exceptions/ data-quality/ settings/
 │  ├─ regions/[regionId]/    Region drilldown
 │  ├─ warehouses/[facilityId]/ Facility drilldown
-│  └─ reports/               Report Centre, Daily LT Email Preview, Print/PDF pack
+│  └─ reports/               Report Centre and the Print/PDF pack
 │
 ├─ components/
 │  ├─ ui/                    Design system: card, badge, table, drawer, multi-select…
@@ -290,8 +290,7 @@ capacity master row.
    on 06 Sep.
 6. **Cold Chain** → 99.56% compliance, 2 critical excursions, FEFO 97.8%,
    1,826 pallets near expiry.
-7. **Report Centre → Daily LT Email Preview** → what leadership receives at 06:00.
-8. **Print / PDF View** → the A4 landscape pack.
+7. **Report Centre → Print / PDF View** → the A4 landscape pack.
 
 ---
 

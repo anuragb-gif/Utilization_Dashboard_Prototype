@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Download, Eye, FileText, Mail, Printer } from 'lucide-react'
+import { Download, Eye, FileText, Printer } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { Drawer } from '@/components/ui/drawer'
 import { Button, Card, CardHeader, DemoDataBadge } from '@/components/ui/primitives'
@@ -43,28 +43,7 @@ export default function ReportCentrePage() {
         actions={<DemoDataBadge text="Demo data" />}
       />
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Card className="border-brand-200 bg-brand-50/50">
-          <CardHeader
-            title="Daily LT Email Preview"
-            subtitle="Exactly what leadership receives at 06:00 IST each morning"
-            tip="The legacy dashboard is distributed by automated email. This preview renders that email so the compact summary can be reviewed as a deliverable in its own right, not as an afterthought of the interactive screens."
-          />
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <p className="max-w-md text-[11.5px] leading-relaxed text-ink-muted">
-              A single-screen executive summary: network KPIs, region table, the top five exceptions, capacity risk,
-              cold-chain health and the management actions for the day.
-            </p>
-            <Link
-              href="/reports/email-preview"
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-brand-500 bg-brand-500 px-3 text-[13px] font-medium text-white transition-colors hover:bg-brand-600"
-            >
-              <Mail className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
-              Open email preview
-            </Link>
-          </div>
-        </Card>
-
+      <div className="grid gap-3">
         <Card className="border-brand-200 bg-brand-50/50">
           <CardHeader
             title="Print / PDF View"

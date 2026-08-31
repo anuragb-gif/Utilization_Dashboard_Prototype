@@ -8,7 +8,7 @@ import { FilterBar } from './filter-bar'
 import { SessionProvider } from '@/lib/state/session-context'
 
 /** Routes that render as documents rather than as application screens. */
-const BARE_ROUTES = ['/reports/print', '/reports/email-preview']
+const BARE_ROUTES = ['/reports/print']
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()

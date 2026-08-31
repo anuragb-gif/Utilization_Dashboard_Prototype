@@ -1,10 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
 import {
   FileSpreadsheet,
-  Mail,
   PanelLeftClose,
   PanelLeftOpen,
   Printer,
@@ -139,13 +137,6 @@ export function TopBar({
               <Printer className="h-3 w-3" strokeWidth={2.5} aria-hidden />
               PDF
             </Button>
-            <Link
-              href="/reports/email-preview"
-              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-brand-500 bg-brand-500 px-2.5 text-[12px] font-medium text-white transition-colors hover:bg-brand-600"
-            >
-              <Mail className="h-3 w-3" strokeWidth={2.5} aria-hidden />
-              Email preview
-            </Link>
           </div>
         </div>
       </div>
