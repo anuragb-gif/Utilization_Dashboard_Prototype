@@ -300,6 +300,11 @@ export function DailyReportLocationTable({
         <tbody>
           {rows.map((row) => {
             const over = (row.own.utilizationPct ?? 0) > 100
+            // A location with no capacity master row still holds stock. The
+            // rollup parks that occupancy outside the denominator, so read it
+            // back here rather than printing a zero against a live warehouse.
+            const noCapacityMaster = row.own.capacity === null
+            const occupied = noCapacityMaster ? row.own.excludedUtilizedPallets : row.own.utilizedPallets
             return (
               <tr key={row.facilityId} className="border-b border-hairline/60 last:border-0 hover:bg-slate-50/60">
                 <th scope="row" className="sticky left-0 z-10 bg-surface px-3 py-1.5 text-left font-normal">
@@ -318,7 +323,16 @@ export function DailyReportLocationTable({
                 <Cell value={formatNumber(row.dry.capacity)} missing={row.dry.capacity === null} bordered />
                 <PctCell pct={row.dry.utilizationPct} />
                 <Cell value={formatNumber(row.own.capacity)} missing={row.own.capacity === null} bordered strong />
-                <Cell value={formatNumber(row.own.utilizedPallets)} strong />
+                <Cell
+                  value={formatNumber(occupied)}
+                  strong
+                  muted={noCapacityMaster}
+                  title={
+                    noCapacityMaster
+                      ? 'Occupied pallets are reported, but excluded from utilization because this location has no capacity master row.'
+                      : undefined
+                  }
+                />
                 <Cell
                   value={formatNumber(row.own.netEmptyPallets)}
                   missing={row.own.netEmptyPallets === null}
@@ -368,6 +382,7 @@ function Cell({
   strong,
   muted,
   tone,
+  title,
 }: {
   value: string
   missing?: boolean
@@ -375,9 +390,11 @@ function Cell({
   strong?: boolean
   muted?: boolean
   tone?: 'bad'
+  title?: string
 }) {
   return (
     <td
+      title={title}
       className={cn(
         'tnum px-2 py-1.5 text-right text-[11.5px]',
         bordered && 'border-l border-hairline',
