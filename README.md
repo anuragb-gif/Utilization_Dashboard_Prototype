@@ -100,6 +100,19 @@ confirmed, so it is carried across under its original name with an explicit
 "Definition to be mapped from Snowman source system" note and no invented
 formula, target or threshold.
 
+**Form follows the question.** The analytical screen picks each chart from the
+job the data has to do, and the colour decisions are computed rather than
+eyeballed: one validated single-hue sequential ramp carries every magnitude
+encoding (heatmap, treemap), status colour is reserved for status and never
+appears as a series, no chart carries a second y-axis, and no hue is ever
+generated to seat an extra series. The ramp was run through the dataviz
+validator's ordinal checks in both modes and passes all four. Where a form
+turned out not to fit the data it was replaced rather than forced: a Pareto of
+occupancy came out as forty-six two-percent bars under a straight diagonal,
+because this network has almost no concentration, so it became a concentration
+curve against a perfectly-even reference — which says the same true thing and
+says it legibly.
+
 **The daily mail is reproduced as a report, not as a mail.** Each region and
 location gets the same figures the automated mail publishes — the F/C and Dry
 split, the own subtotal, Park & Pay and the combined total — but as one table

@@ -94,6 +94,11 @@ export function buildFacilityRollup(facility: Facility): FacilityRollup {
       const past = utilizationOnDay(facility.id, 7)
       return past === null ? null : Number((pct - past).toFixed(2))
     })()
+  // A 30-day baseline as well as a 7-day one: a week of movement is noise at a
+  // single site, a month is a direction.
+  const utilization30dAgo = utilizationOnDay(facility.id, 30)
+  const change30d =
+    pct === null || utilization30dAgo === null ? null : Number((pct - utilization30dAgo).toFixed(2))
 
   const forecast7 = forecastAt(facility.id, 7)
   const forecast14 = forecastAt(facility.id, 14)
@@ -121,6 +126,8 @@ export function buildFacilityRollup(facility: Facility): FacilityRollup {
     targetPct: region.targetPct,
     variancePct: varianceToTarget(pct, region.targetPct),
     change7dPct: change7d,
+    change30dPct: change30d,
+    utilizationPct30dAgo: utilization30dAgo,
     forecast7dPct: forecast7,
     forecast14dPct: forecast14,
     forecast30dPct: forecast30,
@@ -163,6 +170,8 @@ export function buildRegionRollups(facilities: Facility[]): RegionRollup[] {
 
     const past7 = weighted((id) => utilizationOnDay(id, 7))
     const change7d = base.utilizationPct === null || past7 === null ? null : Number((base.utilizationPct - past7).toFixed(2))
+    const past30 = weighted((id) => utilizationOnDay(id, 30))
+    const change30d = base.utilizationPct === null || past30 === null ? null : Number((base.utilizationPct - past30).toFixed(2))
     const forecast30 = weighted((id) => forecastAt(id, 30))
 
     const overFacilities = scoped.filter((f) => f.utilizedPallets > (f.capacity as number)).length
@@ -175,6 +184,8 @@ export function buildRegionRollups(facilities: Facility[]): RegionRollup[] {
       targetPct: target,
       variancePct: varianceToTarget(base.utilizationPct, target),
       change7dPct: change7d,
+      change30dPct: change30d,
+      utilizationPct30dAgo: past30,
       forecast30dPct: forecast30,
       status,
       risk: overFacilities > 0 ? 'critical' : statusToSeverity(forecastRisk(base.utilizationPct, forecast30)),

@@ -297,6 +297,10 @@ export interface RegionRollup extends CapacityRollup {
   targetPct: number
   variancePct: number | null
   change7dPct: number | null
+  /** 30-day movement in percentage points. */
+  change30dPct: number | null
+  /** Utilization 30 days ago, for before/after comparisons. */
+  utilizationPct30dAgo: number | null
   forecast30dPct: number | null
   status: StatusLevel
   risk: Severity
@@ -318,6 +322,10 @@ export interface FacilityRollup extends CapacityRollup {
   targetPct: number
   variancePct: number | null
   change7dPct: number | null
+  /** 30-day movement in percentage points - a direction rather than noise. */
+  change30dPct: number | null
+  /** Utilization 30 days ago, for before/after comparisons. */
+  utilizationPct30dAgo: number | null
   forecast7dPct: number | null
   forecast14dPct: number | null
   forecast30dPct: number | null
